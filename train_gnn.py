@@ -5,6 +5,8 @@ from torch_geometric.loader import DataLoader
 from torch_geometric.utils import train_test_split_edges
 from GNN_model import GNN
 
+from torch_geometric.datasets import Amazon, Twitter  # Hypothetical imports
+
 def train(model, optimizer, data):
     model.train()
     optimizer.zero_grad()
@@ -24,8 +26,20 @@ def test(model, data):
         acc = (pred == target).sum().item() / target.size(0)
     return acc
 
+def load_dataset(name):
+    if name in ['Cora', 'Citeseer', 'PubMed']:
+        return Planetoid(root=f'/tmp/{name}', name=name)
+    elif name == 'Amazon':
+        return Amazon(root='/tmp/Amazon')  # Hypothetical dataset loading
+    elif name == 'Twitter':
+        return Twitter(root='/tmp/Twitter')  # Hypothetical dataset loading
+    else:
+        raise ValueError(f"Unknown dataset: {name}")
+
 def main():
-    dataset = Planetoid(root='/tmp/Cora', name='Cora')
+    datasets = ['Cora', 'Citeseer', 'PubMed', 'Amazon', 'Twitter']
+    dataset_name = datasets[0]  # Change this to the desired dataset
+    dataset = load_dataset(dataset_name)
     data = dataset[0]
     data = train_test_split_edges(data)
 
