@@ -10,8 +10,7 @@ from torch_geometric.nn import GCNConv
 from torch_geometric.loader import DataLoader
 from torch.utils.data import random_split
 import torch
-import torch.nn.functional as F
-from torch_geometric.nn import GCNConv
+from torch_geometric.nn import GATConv
 from torch_geometric.data import Dataset
 from torch_geometric.data import Data
 from torch_geometric.nn import global_mean_pool
@@ -111,7 +110,6 @@ class GNN(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
         super(GNN, self).__init__()
         self.conv1 = GCNConv(in_channels, hidden_channels)
-        # GAT(in_channels, hidden_channels)
         self.conv2 = GCNConv(hidden_channels, hidden_channels)
         self.fc = torch.nn.Linear(hidden_channels, out_channels)
 
@@ -124,21 +122,68 @@ class GNN(torch.nn.Module):
         x = self.fc(x)
         return x
 
+
+
+class GATBinaryClassifier(torch.nn.Module):
+    def __init__(self, in_channels, hidden_channels, num_heads, out_channels):
+        super(GATBinaryClassifier, self).__init__()
+        self.conv1 = GATConv(in_channels, hidden_channels, heads=num_heads)
+        self.conv2 = GATConv(hidden_channels * num_heads, hidden_channels, heads=1)
+        self.fc = torch.nn.Linear(hidden_channels, out_channels)
+
+    def forward(self, data):
+        x, edge_index, batch = data.x, data.edge_index, data.batch
+        x = self.conv1(x, edge_index)
+        x = F.elu(x)
+        x = self.conv2(x, edge_index) # + x  # Skip connection
+        x = global_mean_pool(x, batch)  # Readout layer
+        x = self.fc(x)
+        return x  # Classification layer
+
+
 def main():
     # .. goes up one level in directory
-    # path = r'../datasets/Car-Hacking Dataset/Fuzzy_dataset.csv'
-    # path = r'../datasets/Car-Hacking Dataset/DoS_dataset.csv'
-    # path = r'../datasets/Car-Hacking Dataset/gear_dataset.csv'
+    path = r'datasets/Car-Hacking Dataset/Fuzzy_dataset.csv'
+    path = r'datasets/Car-Hacking Dataset/DoS_dataset.csv'
+    path = r'datasets/Car-Hacking Dataset/gear_dataset.csv'
     path = r'datasets/Car-Hacking Dataset/RPM_dataset.csv'
     df = pd.read_csv(path)
-    df.columns = ['Timestamp', 'CAN ID','DLC','Data1','Data2','Data3','Data4','Data5','Data6','Data7','Data8', 'label'] 
+    df.columns = ['Timestamp', 'CAN ID','DLC','Data1','Data2','Data3','Data4','Data5','Data6','Data7','Data8', 'label']
+    combined = True
     
-    arr = dataset_creation(path)
-    list_graphs = create_graphs(arr, window_size=50, stride=50)
-    # Create the dataset
-    dataset = GraphDataset(list_graphs)
+    if combined:
+        # simple BC where all datasets are combined
+        path = r'datasets/Car-Hacking Dataset/Fuzzy_dataset.csv'
+        arr_Fuzzy = dataset_creation(path)
+        
+        path = r'datasets/Car-Hacking Dataset/DoS_dataset.csv'
+        arr_DoS = dataset_creation(path)
+        
+        path = r'datasets/Car-Hacking Dataset/gear_dataset.csv'
+        arr_gear = dataset_creation(path)
+        
+        path = r'datasets/Car-Hacking Dataset/RPM_dataset.csv'
+        arr_RPM = dataset_creation(path)
+        
+        list_graphs_fuzzy = create_graphs(arr_Fuzzy, window_size=50, stride=50)
 
-    num_epochs = 10
+        list_graphs_DoS = create_graphs(arr_DoS, window_size=50, stride=50)
+        
+        list_graphs_gear = create_graphs(arr_gear, window_size=50, stride=50)
+        
+        list_graphs_RPM = create_graphs(arr_RPM, window_size=50, stride=50)
+        
+        combined_list = list_graphs_fuzzy + list_graphs_DoS + list_graphs_gear + list_graphs_RPM
+        # Create the dataset
+        dataset = GraphDataset(combined_list)
+    
+    else:
+        arr = dataset_creation(path)
+        list_graphs = create_graphs(arr, window_size=50, stride=50)
+        # Create the dataset
+        dataset = GraphDataset(list_graphs)
+
+    num_epochs = 300
 
     train_ratio = 0.8
 
@@ -146,23 +191,27 @@ def main():
     # Split the dataset into training and test sets
     train_size = int(train_ratio * len(dataset))
     test_size = len(dataset) - train_size
-    train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+    generator1 = torch.Generator().manual_seed(42)
+    train_dataset, test_dataset = random_split(dataset, [train_size, test_size], generator=generator1)
 
     # Create DataLoaders
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
-    # model = AnomalyGNN(num_node_features=50, hidden_channels=64)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # device = torch.device('cpu')
     print(f'Model is using device: {device}')
-    model = GNN(in_channels=1, hidden_channels=16, out_channels=1).to(device)
+    # model = GNN(in_channels=1, hidden_channels=16, out_channels=1).to(device)
+    model = GATBinaryClassifier(in_channels=1, hidden_channels=32, num_heads=16, out_channels=1).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
     criterion = nn.BCEWithLogitsLoss()
+    best_val_loss = float('inf')
+    model_path = 'best_model.pth'
 
+    start_time = time.time()
     for epoch in range(num_epochs):
         for batch in train_loader:
             optimizer.zero_grad()
+            batch.to(device) # put batch tensor on the correct device
             out = model(batch).squeeze() 
             # print(out)
             # print(batch.y)
@@ -171,11 +220,36 @@ def main():
             loss.backward()
             optimizer.step()
         
-        print(f'Epoch {epoch+1}, Loss: {loss.item()}')
+        # Validation phase
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for data in test_loader:
+                data.to(device)
+                outputs = model(data).squeeze() 
+                loss = F.binary_cross_entropy_with_logits(outputs, data.y.float())
+                val_loss += loss.item()
 
+        
+        
+        print(f'Epoch {epoch+1}, Loss: {loss.item()}')
+        val_loss /= len(test_loader)
+        print(f"Epoch {epoch+1}, Validation Loss: {val_loss}")
+
+        # Save the best model
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            torch.save(model.state_dict(), model_path)
+            print(f'Best model saved with validation loss: {best_val_loss}')
+    
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Model Training Runtime: {elapsed_time:.4f} seconds")
     train_acc = test(train_loader, model, device)
     test_acc = test(test_loader, model, device)
     print(f'Train Accuracy: {train_acc:.4f}, Test Accuracy: {test_acc:.4f}')
+
+    torch.save(model.state_dict(), 'final_model.pth')
     
 
 if __name__ == "__main__":
