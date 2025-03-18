@@ -2,19 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
+from torch_geometric.nn import GATConv
 from torch_geometric.nn import global_mean_pool
-class SimpleGNN(torch.nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim):
-        super(SimpleGNN, self).__init__()
-        self.conv1 = GCNConv(input_dim, hidden_dim)
-        self.conv2 = GCNConv(hidden_dim, output_dim)
-
-    def forward(self, x, edge_index):
-        x = self.conv1(x, edge_index)
-        x = F.relu(x)
-        x = F.dropout(x, p=0.5, training=self.training)
-        x = self.conv2(x, edge_index)
-        return F.log_softmax(x, dim=1)
 
 class SimpleLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size):
@@ -43,19 +32,6 @@ class SimpleLSTM(nn.Module):
         out = self.fc(out[:, -1, :])
         return out
 
-class AnomalyGNN(nn.Module):
-    def __init__(self, num_node_features, hidden_channels):
-        super(AnomalyGNN, self).__init__()
-        self.conv1 = GCNConv(num_node_features, hidden_channels)
-        self.conv2 = GCNConv(hidden_channels, hidden_channels)
-        self.classifier = nn.Linear(hidden_channels, 1)
-
-    def forward(self, x, edge_index):
-        x = F.relu(self.conv1(x, edge_index))
-        x = F.relu(self.conv2(x, edge_index))
-        x = global_mean_pool(x, batch)  # Aggregate node features
-        return self.classifier(x).squeeze()
-
 class GNN(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
         super(GNN, self).__init__()
@@ -72,6 +48,23 @@ class GNN(torch.nn.Module):
         x = self.fc(x)
         return x
 
+
+
+class GATBinaryClassifier(torch.nn.Module):
+    def __init__(self, in_channels, hidden_channels, num_heads, out_channels):
+        super(GATBinaryClassifier, self).__init__()
+        self.conv1 = GATConv(in_channels, hidden_channels, heads=num_heads)
+        self.conv2 = GATConv(hidden_channels * num_heads, hidden_channels, heads=1)
+        self.fc = torch.nn.Linear(hidden_channels, out_channels)
+
+    def forward(self, data):
+        x, edge_index, batch = data.x, data.edge_index, data.batch
+        x = self.conv1(x, edge_index)
+        x = F.elu(x)
+        x = self.conv2(x, edge_index) # + x  # Skip connection
+        x = global_mean_pool(x, batch)  # Readout layer
+        x = self.fc(x)
+        return x  # Classification layer
 
 if __name__ == '__main__':
     # Initialize the model

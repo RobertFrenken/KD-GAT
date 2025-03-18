@@ -1,0 +1,15 @@
+---
+
+rounds: 10
+clients: 10
+epochs: 10
+lr: 0.001
+momentum: 0.9
+dataset: 'mnist'
+datasize: 1.0
+partition_strategy: 'Dirichlet'
+aggregation_strategy: 'FedAvg'
+optimizer: torch.optim.SGD
+topology: 'complete'
+device: torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
