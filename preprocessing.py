@@ -20,6 +20,44 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 import wandb
 
+def graph_creation(combined, path, window_size, stride):
+    
+    if combined:
+        # simple BC where all datasets are combined
+        path = r'datasets/Car-Hacking Dataset/Fuzzy_dataset.csv'
+        arr_Fuzzy = dataset_creation(path)
+        
+        path = r'datasets/Car-Hacking Dataset/DoS_dataset.csv'
+        arr_DoS = dataset_creation(path)
+        
+        path = r'datasets/Car-Hacking Dataset/gear_dataset.csv'
+        arr_gear = dataset_creation(path)
+        
+        path = r'datasets/Car-Hacking Dataset/RPM_dataset.csv'
+        arr_RPM = dataset_creation(path)
+        
+        list_graphs_fuzzy = create_graphs(arr_Fuzzy, window_size=50, stride=50)
+
+        list_graphs_DoS = create_graphs(arr_DoS, window_size=50, stride=50)
+        
+        list_graphs_gear = create_graphs(arr_gear, window_size=50, stride=50)
+        
+        list_graphs_RPM = create_graphs(arr_RPM, window_size=50, stride=50)
+        
+        combined_list = list_graphs_fuzzy + list_graphs_DoS + list_graphs_gear + list_graphs_RPM
+        # Create the dataset
+        dataset = GraphDataset(combined_list)
+
+    
+    else:
+        arr = dataset_creation(path)
+        list_graphs = create_graphs(arr, window_size=50, stride=50)
+        # Create the dataset
+        dataset = GraphDataset(list_graphs)
+
+    return dataset
+
+
 def dataset_creation(path):
     df = pd.read_csv(path)
     df.columns = ['Timestamp', 'CAN ID','DLC','Data1','Data2','Data3','Data4','Data5','Data6','Data7','Data8', 'label'] 

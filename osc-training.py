@@ -20,54 +20,38 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 import wandb
 from models.models import GNN, GATBinaryClassifier
-from preprocessing import dataset_creation, create_graphs, GraphDataset
+from preprocessing import dataset_creation, create_graphs, GraphDataset, graph_creation
 from training_utils import train, test
 WANDB_API_KEY = "02399594f766bc76e4af844217bf8188630cae40"
 @hydra.main(config_path="conf", config_name="base", version_base=None)
 
-def main():
-    # .. goes up one level in directory
+def main(config: DictConfig):
+
+    config_dict = OmegaConf.to_container(config, resolve=True)
+    print(config_dict)
+
+    # make device the first line
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f'Model is using device: {device}')
+    if device.type == 'cuda':
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
+        print(f"Memory allocated: {torch.cuda.memory_allocated(0) / 1e9:.2f} GB")
+        print(f"Memory cached: {torch.cuda.memory_reserved(0) / 1e9:.2f} GB")
+    
     path = r'datasets/Car-Hacking Dataset/Fuzzy_dataset.csv'
     path = r'datasets/Car-Hacking Dataset/DoS_dataset.csv'
     path = r'datasets/Car-Hacking Dataset/gear_dataset.csv'
     path = r'datasets/Car-Hacking Dataset/RPM_dataset.csv'
     df = pd.read_csv(path)
     df.columns = ['Timestamp', 'CAN ID','DLC','Data1','Data2','Data3','Data4','Data5','Data6','Data7','Data8', 'label']
-    combined = True
-    
-    if combined:
-        # simple BC where all datasets are combined
-        path = r'datasets/Car-Hacking Dataset/Fuzzy_dataset.csv'
-        arr_Fuzzy = dataset_creation(path)
-        
-        path = r'datasets/Car-Hacking Dataset/DoS_dataset.csv'
-        arr_DoS = dataset_creation(path)
-        
-        path = r'datasets/Car-Hacking Dataset/gear_dataset.csv'
-        arr_gear = dataset_creation(path)
-        
-        path = r'datasets/Car-Hacking Dataset/RPM_dataset.csv'
-        arr_RPM = dataset_creation(path)
-        
-        list_graphs_fuzzy = create_graphs(arr_Fuzzy, window_size=50, stride=50)
+    combined = config['combined']
 
-        list_graphs_DoS = create_graphs(arr_DoS, window_size=50, stride=50)
-        
-        list_graphs_gear = create_graphs(arr_gear, window_size=50, stride=50)
-        
-        list_graphs_RPM = create_graphs(arr_RPM, window_size=50, stride=50)
-        
-        combined_list = list_graphs_fuzzy + list_graphs_DoS + list_graphs_gear + list_graphs_RPM
-        # Create the dataset
-        dataset = GraphDataset(combined_list)
-    
-    else:
-        arr = dataset_creation(path)
-        list_graphs = create_graphs(arr, window_size=50, stride=50)
-        # Create the dataset
-        dataset = GraphDataset(list_graphs)
+    dataset = graph_creation(combined, path, window_size=50, stride=50)
 
-    num_epochs = 300
+    # hyperparameters from yaml file
+    EPOCHS = config_dict['epochs']
+    LR = config_dict['lr']
+    BATCH_SIZE = config_dict['batch_size']
 
     train_ratio = 0.8
 
@@ -79,20 +63,19 @@ def main():
     train_dataset, test_dataset = random_split(dataset, [train_size, test_size], generator=generator1)
 
     # Create DataLoaders
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f'Model is using device: {device}')
+    
     # model = GNN(in_channels=1, hidden_channels=16, out_channels=1).to(device)
     model = GATBinaryClassifier(in_channels=1, hidden_channels=32, num_heads=16, out_channels=1).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LR)
     criterion = nn.BCEWithLogitsLoss()
     best_val_loss = float('inf')
     model_path = 'best_model.pth'
 
     start_time = time.time()
-    for epoch in range(num_epochs):
+    for epoch in range(EPOCHS):
         for batch in train_loader:
             optimizer.zero_grad()
             batch.to(device) # put batch tensor on the correct device

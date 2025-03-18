@@ -1,17 +1,14 @@
----
-
 rounds: 10
 clients: 10
 epochs: 3
 lr: 0.0005
-combined: True
+combined: true
 batch_size: 32
 momentum: 0.9
-dataset: 'mnist'
+dataset: mnist
 datasize: 1.0
-partition_strategy: 'Dirichlet'
-aggregation_strategy: 'FedAvg'
+partition_strategy: Dirichlet
+aggregation_strategy: FedAvg
 optimizer: torch.optim.SGD
-topology: 'complete'
+topology: complete
 device: torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
