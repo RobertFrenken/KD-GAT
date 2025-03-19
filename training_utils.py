@@ -24,7 +24,7 @@ def train(model, optimizer, train_loader, device):
         loss.backward()
         optimizer.step()
 
-def test(loader, model, device):
+def evaluation(loader, model, device):
     model.eval()
     correct = 0
     with torch.no_grad():
@@ -35,3 +35,38 @@ def test(loader, model, device):
             pred = (out > 0).long()
             correct += (pred == data.y).sum().item()
     return correct / len(loader.dataset)
+
+def training(EPOCHS, model, optimizer, criterion, train_loader, test_loader, device, model_path):
+
+    best_val_loss = float('inf')
+
+    for epoch in range(EPOCHS):
+        for batch in train_loader:
+            optimizer.zero_grad()
+            batch.to(device) # put batch tensor on the correct device
+            out = model(batch).squeeze() 
+            loss = criterion(out, batch.y.float())
+            loss.backward()
+            optimizer.step()
+        
+        # Validation phase
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for data in test_loader:
+                data.to(device)
+                outputs = model(data).squeeze() 
+                loss = criterion(outputs, data.y.float())
+                val_loss += loss.item()
+
+        
+        
+        print(f'Epoch {epoch+1}, Loss: {loss.item()}')
+        val_loss /= len(test_loader)
+        print(f"Epoch {epoch+1}, Validation Loss: {val_loss}")
+
+        # Save the best model
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            torch.save(model.state_dict(), model_path)
+            print(f'Best model saved with validation loss: {best_val_loss}')

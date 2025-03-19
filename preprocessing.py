@@ -20,7 +20,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 import wandb
 
-def graph_creation(combined, path, window_size, stride):
+def graph_creation(combined, path, window_size=50, stride=50):
     
     if combined:
         # simple BC where all datasets are combined
@@ -36,13 +36,13 @@ def graph_creation(combined, path, window_size, stride):
         path = r'datasets/Car-Hacking Dataset/RPM_dataset.csv'
         arr_RPM = dataset_creation(path)
         
-        list_graphs_fuzzy = create_graphs(arr_Fuzzy, window_size=50, stride=50)
+        list_graphs_fuzzy = create_graphs(arr_Fuzzy, window_size=window_size, stride=stride)
 
-        list_graphs_DoS = create_graphs(arr_DoS, window_size=50, stride=50)
+        list_graphs_DoS = create_graphs(arr_DoS, window_size=window_size, stride=stride)
         
-        list_graphs_gear = create_graphs(arr_gear, window_size=50, stride=50)
+        list_graphs_gear = create_graphs(arr_gear, window_size=window_size, stride=stride)
         
-        list_graphs_RPM = create_graphs(arr_RPM, window_size=50, stride=50)
+        list_graphs_RPM = create_graphs(arr_RPM, window_size=window_size, stride=stride)
         
         combined_list = list_graphs_fuzzy + list_graphs_DoS + list_graphs_gear + list_graphs_RPM
         # Create the dataset

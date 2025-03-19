@@ -10,10 +10,6 @@ from torch_geometric.nn import GCNConv
 from torch_geometric.loader import DataLoader
 from torch.utils.data import random_split
 import torch
-from torch_geometric.nn import GATConv
-from torch_geometric.data import Dataset
-from torch_geometric.data import Data
-from torch_geometric.nn import global_mean_pool
 import sys
 import time
 import hydra
@@ -21,7 +17,7 @@ from omegaconf import DictConfig, OmegaConf
 import wandb
 from models.models import GNN, GATBinaryClassifier
 from preprocessing import dataset_creation, create_graphs, GraphDataset, graph_creation
-from training_utils import train, test
+from training_utils import train, evaluation, training
 WANDB_API_KEY = "02399594f766bc76e4af844217bf8188630cae40"
 @hydra.main(config_path="conf", config_name="base", version_base=None)
 
@@ -52,12 +48,11 @@ def main(config: DictConfig):
     EPOCHS = config_dict['epochs']
     LR = config_dict['lr']
     BATCH_SIZE = config_dict['batch_size']
-
-    train_ratio = 0.8
+    TRAIN_RATIO = config_dict['train_ratio']
 
     # Calculate the number of samples for training and testing
     # Split the dataset into training and test sets
-    train_size = int(train_ratio * len(dataset))
+    train_size = int(TRAIN_RATIO * len(dataset))
     test_size = len(dataset) - train_size
     generator1 = torch.Generator().manual_seed(42)
     train_dataset, test_dataset = random_split(dataset, [train_size, test_size], generator=generator1)
@@ -71,49 +66,18 @@ def main(config: DictConfig):
     model = GATBinaryClassifier(in_channels=1, hidden_channels=32, num_heads=16, out_channels=1).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
     criterion = nn.BCEWithLogitsLoss()
-    best_val_loss = float('inf')
     model_path = 'best_model.pth'
 
     start_time = time.time()
-    for epoch in range(EPOCHS):
-        for batch in train_loader:
-            optimizer.zero_grad()
-            batch.to(device) # put batch tensor on the correct device
-            out = model(batch).squeeze() 
-            # print(out)
-            # print(batch.y)
-            loss = F.binary_cross_entropy_with_logits(out, batch.y.float())
-            # loss = criterion(out, batch.y)
-            loss.backward()
-            optimizer.step()
-        
-        # Validation phase
-        model.eval()
-        val_loss = 0.0
-        with torch.no_grad():
-            for data in test_loader:
-                data.to(device)
-                outputs = model(data).squeeze() 
-                loss = F.binary_cross_entropy_with_logits(outputs, data.y.float())
-                val_loss += loss.item()
 
-        
-        
-        print(f'Epoch {epoch+1}, Loss: {loss.item()}')
-        val_loss /= len(test_loader)
-        print(f"Epoch {epoch+1}, Validation Loss: {val_loss}")
-
-        # Save the best model
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            torch.save(model.state_dict(), model_path)
-            print(f'Best model saved with validation loss: {best_val_loss}')
+    # training loop. Function in training_utils.py
+    training(EPOCHS, model, optimizer, criterion, train_loader, test_loader, device, model_path)
     
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(f"Model Training Runtime: {elapsed_time:.4f} seconds")
-    train_acc = test(train_loader, model, device)
-    test_acc = test(test_loader, model, device)
+    train_acc = evaluation(train_loader, model, device)
+    test_acc = evaluation(test_loader, model, device)
     print(f'Train Accuracy: {train_acc:.4f}, Test Accuracy: {test_acc:.4f}')
 
     torch.save(model.state_dict(), 'final_model.pth')
