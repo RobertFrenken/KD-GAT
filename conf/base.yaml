@@ -8,11 +8,9 @@ train_ratio: 0.8
 combined: True
 batch_size: 32
 momentum: 0.9
-dataset: 'mnist'
 datasize: 1.0
 partition_strategy: 'Dirichlet'
 aggregation_strategy: 'FedAvg'
 optimizer: torch.optim.SGD
-topology: 'complete'
 device: torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

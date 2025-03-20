@@ -3,7 +3,6 @@ import pandas as pd # Successfully installed pandas-1.3.5
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
-import networkx as nx
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
@@ -15,9 +14,9 @@ import time
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import wandb
-from models.models import GNN, GATBinaryClassifier
-from preprocessing import dataset_creation, create_graphs, GraphDataset, graph_creation
-from training_utils import train, evaluation, training
+from models.models import GATBinaryClassifier
+from preprocessing import GraphDataset, graph_creation
+from training_utils import evaluation, training
 WANDB_API_KEY = "02399594f766bc76e4af844217bf8188630cae40"
 @hydra.main(config_path="conf", config_name="base", version_base=None)
 
@@ -61,8 +60,6 @@ def main(config: DictConfig):
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-    
-    # model = GNN(in_channels=1, hidden_channels=16, out_channels=1).to(device)
     model = GATBinaryClassifier(in_channels=1, hidden_channels=32, num_heads=16, out_channels=1).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
     criterion = nn.BCEWithLogitsLoss()
