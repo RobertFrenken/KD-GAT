@@ -48,6 +48,40 @@ class GNN(torch.nn.Module):
         x = self.fc(x)
         return x
 
+class SkipProjection(nn.Module):
+    def __init__(self, in_feats, out_feats):
+        super().__init__()
+        self.proj = nn.Linear(in_feats, out_feats)
+    
+    def forward(self, x_skip):
+        return self.proj(x_skip)
+
+# Example: Adjust layer 1's output (64 features) to match layer 3 (128 features)
+skip_adjust = SkipProjection(64, 128)
+adjusted_skip = skip_adjust(layer1_output)
+# For mismatched heads (e.g., layer1: 4 heads, layer3: 6 heads)
+combined_heads = torch.cat([layer1_output, layer3_output], dim=-1)
+combined_heads = nn.Linear(combined_heads.size(-1), target_dim)(combined_heads)
+class GATResBlock(nn.Module):
+    def __init__(self, in_feats, out_feats, num_heads):
+        super().__init__()
+        self.gat = GATConv(in_feats, out_feats, num_heads)
+        self.skip = nn.Linear(in_feats, out_feats * num_heads) if in_feats != out_feats else nn.Identity()
+    
+    def forward(self, x, edge_index):
+        x_gat = self.gat(x, edge_index)
+        x_skip = self.skip(x)
+        return F.elu(x_gat + x_skip)
+
+
+def forward(self, x, edge_index):
+    x1 = self.layer1(x, edge_index)
+    print(f"Layer 1 output shape: {x1.shape}")  # Debug dimensions
+    x2 = self.layer2(x1, edge_index)
+    x3 = self.layer3(x2 + x1_adjusted, edge_index)  # Adjusted skip
+    return x3
+skip_combined = torch.cat([x_main, adjusted_skip], dim=-1)
+x_out = nn.Linear(2 * target_dim, target_dim)(skip_combined)
 
 
 class GATBinaryClassifier(torch.nn.Module):
