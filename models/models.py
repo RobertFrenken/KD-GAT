@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 from torch_geometric.nn import GATConv
 from torch_geometric.nn import global_mean_pool
-
+from torch_geometric.nn import GATConv, Linear, to_hetero, JumpingKnowledge
 class SimpleLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size):
         super(SimpleLSTM, self).__init__()
@@ -48,20 +48,6 @@ class GNN(torch.nn.Module):
         x = self.fc(x)
         return x
 
-class SkipProjection(nn.Module):
-    def __init__(self, in_feats, out_feats):
-        super().__init__()
-        self.proj = nn.Linear(in_feats, out_feats)
-    
-    def forward(self, x_skip):
-        return self.proj(x_skip)
-
-# Example: Adjust layer 1's output (64 features) to match layer 3 (128 features)
-skip_adjust = SkipProjection(64, 128)
-adjusted_skip = skip_adjust(layer1_output)
-# For mismatched heads (e.g., layer1: 4 heads, layer3: 6 heads)
-combined_heads = torch.cat([layer1_output, layer3_output], dim=-1)
-combined_heads = nn.Linear(combined_heads.size(-1), target_dim)(combined_heads)
 class GATResBlock(nn.Module):
     def __init__(self, in_feats, out_feats, num_heads):
         super().__init__()
@@ -91,21 +77,54 @@ class GATBinaryClassifier(torch.nn.Module):
         x = global_mean_pool(x, batch)  # Readout layer
         x = self.fc(x)
         return x  # Classification layer
-from torch_geometric.nn import GATConv, Linear, to_hetero
+class GATWithJK(torch.nn.Module):
+    def __init__(self, in_channels, hidden_channels, out_channels, num_layers=3, heads=4):
+        super().__init__()
+        self.convs = torch.nn.ModuleList()
+        
+        # GAT layers
+        for i in range(num_layers):
+            in_dim = in_channels if i == 0 else hidden_channels * heads
+            self.convs.append(
+                GATConv(in_dim, hidden_channels, heads=heads, concat=True)
+            )
+        
+        # JK aggregation (LSTM mode)
+        self.jk = JumpingKnowledge(
+            mode="lstm",
+            channels=hidden_channels * heads,
+            num_layers=num_layers
+        )
+        
+        # Final projection
+        self.lin = torch.nn.Linear(hidden_channels * heads, out_channels)
+
+    def forward(self, data):
+        x, edge_index, batch = data.x, data.edge_index, data.batch
+        xs = []
+        for conv in self.convs:
+            x = conv(x, edge_index).relu()
+            xs.append(x)
+        
+        # Aggregate layer outputs
+        x = self.jk(xs)
+        x = global_mean_pool(x, batch)  # Readout layer
+        x = self.lin(x)
+        return x
 
 class GATWithSkips(nn.Module):
-    def __init__(self, num_features, num_classes, heads=8):
+    def __init__(self, in_channels, hidden_channels, num_classes, num_heads=8):
         super().__init__()
         # Layer 1: Initial GAT layer
-        self.gat1 = GATConv(num_features, 64, heads=heads)
-        self.skip_proj1 = nn.Linear(num_features, 64 * heads)  # For dimension matching
+        self.gat1 = GATConv(in_channels, 64, heads=num_heads)
+        self.skip_proj1 = nn.Linear(in_channels, 64 * num_heads)  # For dimension matching
         
         # Layer 2: Intermediate GAT layer
-        self.gat2 = GATConv(64 * heads, 128, heads=heads//2)
-        self.skip_proj2 = nn.Linear(64 * heads, 128 * (heads//2))
+        self.gat2 = GATConv(64 * num_heads, 128, heads=num_heads//2)
+        self.skip_proj2 = nn.Linear(64 * num_heads, 128 * (num_heads//2))
         
         # Layer 3: Final GAT layer with skip integration
-        self.gat3 = GATConv(128 * (heads//2) + 64 * heads, num_classes, heads=1)  # Concatenated input
+        self.gat3 = GATConv(128 * (num_heads//2) + 64 * num_heads, num_classes, heads=1)  # Concatenated input
 
     def forward(self, x, edge_index):
         # Layer 1
@@ -143,39 +162,19 @@ class EnhancedGAT(nn.Module):
 
 
 if __name__ == '__main__':
-    # Initialize the model
-    input_features = dataset.num_node_features
-    num_classes = dataset.num_classes
-    model = SimpleGNN(input_features, 16, num_classes)
+    net = GATWithJK(1, 32, 1)
 
-    # Set up optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+    def model_characteristics(model):
+        num_params = sum(p.numel() for p in model.parameters())
+        param_size = 0
+        for param in model.parameters():
+            param_size += param.nelement() * param.element_size()
+        buffer_size = 0
+        for buffer in model.buffers():
+            buffer_size += buffer.nelement() * buffer.element_size()
+        size_all_mb = (param_size + buffer_size) / 1024**2
+        print(f'Number of Parameters: {num_params:.3f}')
+        print(f'Model size: {size_all_mb:.3f} MB')
 
-    # Assuming you have a dataset loaded
-    data = dataset[0]
-
-    # Training loop
-    model.train()
-    for epoch in range(200):
-        optimizer.zero_grad()
-        out = model(data.x, data.edge_index)
-        loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])
-        loss.backward()
-        optimizer.step()
-
-    
-    # LSTM
-    # Example usage:
-    input_size = 10  # number of features
-    hidden_size = 20  # number of features in hidden state
-    num_layers = 2  # number of stacked lstm layers
-    output_size = 1  # number of output classes
-
-    # Create the model
-    model = SimpleLSTM(input_size, hidden_size, num_layers, output_size)
-
-    # Example input (batch_size, sequence_length, input_size)
-    x = torch.randn(32, 5, input_size)
-    # Forward pass
-    output = model(x)
-    print(output.shape)  # Should be (32, 1)
+    model_characteristics(net)
+    print(net)

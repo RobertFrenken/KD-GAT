@@ -44,7 +44,9 @@ def training(EPOCHS, model, optimizer, criterion, train_loader, test_loader, dev
         for batch in train_loader:
             optimizer.zero_grad()
             batch.to(device) # put batch tensor on the correct device
-            out = model(batch).squeeze() 
+            out = model(batch).squeeze()
+            #print("Output shape: ", out.shape)
+            # print("Batch shape: ", batch.y.shape)  
             loss = criterion(out, batch.y.float())
             loss.backward()
             optimizer.step()

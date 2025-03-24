@@ -20,7 +20,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 import wandb
 
-def graph_creation(combined, path, window_size=50, stride=50):
+def graph_creation(combined, path, datasize=1.0, window_size=50, stride=50):
     
     if combined:
         # simple BC where all datasets are combined
