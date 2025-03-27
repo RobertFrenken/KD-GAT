@@ -70,8 +70,11 @@ def dataset_creation(path):
     # Replace NaN values with zero
     df = df.fillna(0)
 
-    # Here I should keep the data field features as well
-    arr = df[['Node', 'Edge', 'label']].to_numpy(dtype=float)
+    # drop timestamp here, and keep everything else for the numpy array
+    df = df.drop(columns=['Timestamp'])
+
+    arr = df.to_numpy(dtype=float)
+    # arr = df[['Node', 'Edge', 'label']].to_numpy(dtype=float)
 
     return arr
 
