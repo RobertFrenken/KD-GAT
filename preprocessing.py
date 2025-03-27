@@ -1,24 +1,8 @@
 import numpy as np # Successfully installed numpy-1.23.5
 import pandas as pd # Successfully installed pandas-1.3.5
-import matplotlib.pyplot as plt
-import seaborn as sns
-import os
-import networkx as nx
-import torch.nn as nn
-import torch.nn.functional as F
-from torch_geometric.nn import GCNConv
-from torch_geometric.loader import DataLoader
-from torch.utils.data import random_split
 import torch
-from torch_geometric.nn import GATConv
 from torch_geometric.data import Dataset
 from torch_geometric.data import Data
-from torch_geometric.nn import global_mean_pool
-import sys
-import time
-import hydra
-from omegaconf import DictConfig, OmegaConf
-import wandb
 
 def graph_creation(combined, path, datasize=1.0, window_size=50, stride=50):
     
@@ -59,6 +43,11 @@ def graph_creation(combined, path, datasize=1.0, window_size=50, stride=50):
 
 
 def dataset_creation(path):
+    '''
+    This function takes in a pandas dataframe, creates a Node and Edge column, 
+    converts the hex values to decimal values, changes the label to a binary value,
+    replaces NaN values with zero, and returns a numpy array.
+    '''
     df = pd.read_csv(path)
     df.columns = ['Timestamp', 'CAN ID','DLC','Data1','Data2','Data3','Data4','Data5','Data6','Data7','Data8', 'label'] 
 
@@ -81,6 +70,7 @@ def dataset_creation(path):
     # Replace NaN values with zero
     df = df.fillna(0)
 
+    # Here I should keep the data field features as well
     arr = df[['Node', 'Edge', 'label']].to_numpy(dtype=float)
 
     return arr
@@ -101,8 +91,24 @@ def create_graphs(data, window_size, stride):
         graphs.append(graph)
     return graphs
 
+
+def create_node_features(data):
+    # What does the node feature matrix look like?
+    # [ID, occurance count, ]
+    # I should make this a function
+    # Node features:
+    # - Node ID
+    # - Frequency in sliding window
+    # - average data field value
+    unique, counts = np.unique(data[:, 0:1], return_counts=True)
+    result = dict(zip(unique, counts))
+    
+    x = torch.tensor(data[:, 0:1], dtype=torch.float)
+    return x
+
 def create_single_graph(window_data):
-        x = torch.tensor(window_data[:, 0:1], dtype=torch.float)
+        
+        x = create_node_features(window_data)
         
         edge_index = _get_edge_index(window_data) # call the edge index function here
         
@@ -111,6 +117,9 @@ def create_single_graph(window_data):
         return Data(x=x, edge_index=edge_index, y=y)
 
 def _get_edge_index(window_data: np.ndarray) -> torch.Tensor:
+        # ------------------------
+        # Edge features:
+        # - number of connections/ instances between the two CAN IDs
         num_nodes = window_data.shape[0]
         edge_index = torch.tensor([np.arange(num_nodes - 1), np.arange(1, num_nodes)], dtype=torch.long)
         return edge_index
