@@ -41,6 +41,7 @@ def training(EPOCHS, model, optimizer, criterion, train_loader, test_loader, dev
     best_val_loss = float('inf')
 
     for epoch in range(EPOCHS):
+        model.train()
         for batch in train_loader:
             optimizer.zero_grad()
             batch.to(device) # put batch tensor on the correct device

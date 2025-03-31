@@ -71,7 +71,7 @@ def main(config: DictConfig):
 
     # model = GATBinaryClassifier(in_channels=1, hidden_channels=32, num_heads=16, out_channels=1).to(device)
     # default 3 layers and 4 heads
-    model = GATWithJK(in_channels=1, hidden_channels=32, out_channels=1).to(device)
+    model = GATWithJK(in_channels=10, hidden_channels=32, out_channels=1).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
     criterion = nn.BCEWithLogitsLoss()
     model_path = 'best_model.pth'
