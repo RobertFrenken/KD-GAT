@@ -162,7 +162,7 @@ class EnhancedGAT(nn.Module):
 
 
 if __name__ == '__main__':
-    net = GATWithJK(1, 32, 1)
+    net = GATWithJK(10, 8, 1)
 
     def model_characteristics(model):
         num_params = sum(p.numel() for p in model.parameters())
