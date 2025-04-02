@@ -47,6 +47,8 @@ def main(config: DictConfig):
     LR = config_dict['lr']
     BATCH_SIZE = config_dict['batch_size']
     TRAIN_RATIO = config_dict['train_ratio']
+
+    print("Size of the total dataset: ", len(dataset))
    
 
     # Calculate the number of samples for training and testing
@@ -55,19 +57,20 @@ def main(config: DictConfig):
     test_size = len(dataset) - train_size
     generator1 = torch.Generator().manual_seed(42)
     train_dataset, test_dataset = random_split(dataset, [train_size, test_size], generator=generator1)
-    # Generate random indices for the subset
-    indices = np.random.choice(train_size, int(train_size*DATASIZE), replace=False)
-    # Create the subset using the indices
-    subset = Subset(train_dataset, indices)
+    
 
-    if DATASIZE < 1.0:
+    if DATASIZE < 0.99:
+        subset_size = int(len(dataset) * DATASIZE)  # Fraction of the total dataset
+        indices = np.random.choice(len(train_dataset), subset_size, replace=False)
+        subset = Subset(train_dataset, indices)
         train_loader = DataLoader(subset, batch_size=BATCH_SIZE, shuffle=True)
     else:
         train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-    print('Size of dataloader: ', len(train_loader))
+    print('Size of Training dataloader: ', len(train_loader))
+    print('Size of Testing dataloader: ', len(test_loader))
 
     # model = GATBinaryClassifier(in_channels=1, hidden_channels=32, num_heads=16, out_channels=1).to(device)
     # default 3 layers and 4 heads
