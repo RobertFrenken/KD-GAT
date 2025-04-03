@@ -57,10 +57,13 @@ def main(config: DictConfig):
     test_size = len(dataset) - train_size
     generator1 = torch.Generator().manual_seed(42)
     train_dataset, test_dataset = random_split(dataset, [train_size, test_size], generator=generator1)
+    print('Size of DATASIZE: ', DATASIZE)
+    print('Size of Training dataset: ', len(train_dataset))
+    print('Size of Testing dataset: ', len(test_dataset))
     
 
-    if DATASIZE < 0.99:
-        subset_size = int(len(dataset) * DATASIZE)  # Fraction of the total dataset
+    if DATASIZE < 1.0:
+        subset_size = int(len(train_dataset) * DATASIZE)  # Fraction of the total dataset
         indices = np.random.choice(len(train_dataset), subset_size, replace=False)
         subset = Subset(train_dataset, indices)
         train_loader = DataLoader(subset, batch_size=BATCH_SIZE, shuffle=True)
@@ -71,6 +74,10 @@ def main(config: DictConfig):
 
     print('Size of Training dataloader: ', len(train_loader))
     print('Size of Testing dataloader: ', len(test_loader))
+    print('Size of Training dataloader (samples): ', len(train_loader.dataset))
+    print('Size of Testing dataloader (samples): ', len(test_loader.dataset))
+
+    return # exit early for testing
 
     # model = GATBinaryClassifier(in_channels=1, hidden_channels=32, num_heads=16, out_channels=1).to(device)
     # default 3 layers and 4 heads

@@ -41,95 +41,6 @@ def graph_creation(combined, path, datasize=1.0, window_size=50, stride=50):
 
     return dataset
 
-
-def hex_to_decimal(x):
-    if x is None or x == 'None':
-        return None
-    try:
-        return int(x, 16)
-    except (ValueError, TypeError):
-        return x
-    
-
-def pad_row(row):
-    if row['DLC'] != 8:
-        # grab the label
-        label = row['Data'+str(row['DLC']+1)]
-        row['Data'+str(row['DLC']+1)] = '00'
-        row['label'] = label
-
-    row.fillna(value='00', inplace=True) # Fill missing values with '00'
-    return row
-
-def dataset_creation(path):
-    df = pd.read_csv(path)
-    df.columns = ['Timestamp', 'CAN ID','DLC','Data1','Data2','Data3','Data4','Data5','Data6','Data7','Data8', 'label'] 
-
-    df['Source'] = df['CAN ID']
-    df['Target'] = df['CAN ID'].shift(-1)
-
-    df = df.apply(pad_row, axis=1)
-
-    df = df.apply(lambda x: x.apply(hex_to_decimal))
-
-    # Drop the last row
-    df = df.drop(df.index[-1])
-
-    # reencode the labels
-    df['label'] = df['label'].replace({'R': 0, 'T': 1})
-
-    return df[['CAN ID', 'Data1','Data2','Data3','Data4','Data5','Data6','Data7','Data8', 'Source', 'Target', 'label']]
-
-def create_graphs(data, window_size, stride):
-    
-    graphs = []
-    for i in range(0, len(data) - window_size + 1, stride):
-        window = data[i:i+window_size]
-        graph = window_data_transform(window)
-        graphs.append(graph)
-    return graphs
-
-def window_data_transform(df):
-    # Calculate edge counts for each unique (Source, Target) pair
-    edge_counts = df.groupby(['Source', 'Target']).size().reset_index(name='count')
-
-    # Create node index mapping
-    nodes = pd.unique(pd.concat([df['Source'], df['Target']]))
-    node_to_idx = {n:i for i,n in enumerate(nodes)}
-
-    # Convert to edge indices tensor
-    edge_index = torch.tensor(
-        edge_counts[['Source','Target']].apply(lambda x: x.map(node_to_idx)).values.T, 
-        dtype=torch.long
-    )
-
-    # Create edge features tensor (counts)
-    edge_attr = torch.tensor(edge_counts['count'].values, dtype=torch.float).view(-1,1)
-
-    # Calculate node statistics
-    node_features = df.groupby('CAN ID').agg(
-    Data1=('Data1', 'mean'),
-    Data2=('Data2', 'mean'),
-    Data3=('Data3', 'mean'),
-    Data4=('Data4', 'mean'),
-    Data5=('Data5', 'mean'),
-    Data6=('Data6', 'mean'),
-    Data7=('Data7', 'mean'),
-    Data8=('Data8', 'mean'),
-    Count=('Source', 'count')).reindex(nodes).reset_index()  # Ensure index alignment
-
-    # Create node features tensor
-    x = torch.tensor(node_features.values, dtype=torch.float)
-    y = torch.tensor([1 if 1 in df['label'] else 0], dtype=torch.long)
-
-    graph_data = Data(
-        x=x,
-        edge_index=edge_index,
-        edge_attr=edge_attr,
-        y=y
-    )
-    return graph_data
-
 def create_graphs_numpy(data, window_size, stride):
     """
     Transforms a pandas dataframe into a list of PyTorch Geometric Data object.
@@ -162,7 +73,7 @@ def create_graphs_numpy(data, window_size, stride):
 
     return graphs
 
-# TODO: Need to modify the node features to also get the count of the CAN ID
+
 def window_data_transform_numpy(data):
     """
     Transforms a NumPy array window into a PyTorch Geometric Data object.
