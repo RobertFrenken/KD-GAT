@@ -1,5 +1,7 @@
 # CAN-Graph
- Deriving Graph Based Features from CAN Frames
+CAN-GAT
+
+Deriving Graph Based Features from CAN Frames
 
 OTIDS Dataset with Attack States:
 https://ocslab.hksecurity.net/Dataset/CAN-intrusion-dataset
