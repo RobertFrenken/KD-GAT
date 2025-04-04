@@ -8,28 +8,22 @@ def graph_creation(combined, path, datasize=1.0, window_size=50, stride=50):
     
     if combined:
         # simple BC where all datasets are combined
-        path = r'datasets/Car-Hacking Dataset/Fuzzy_dataset.csv'
-        df_Fuzzy = dataset_creation_vectorized(path)
+        fuzzy_path = r'datasets/Car-Hacking Dataset/Fuzzy_dataset.csv'
+        dos_path = r'datasets/Car-Hacking Dataset/DoS_dataset.csv'
+        gear_path = r'datasets/Car-Hacking Dataset/gear_dataset.csv'
+        rpm_path = r'datasets/Car-Hacking Dataset/RPM_dataset.csv'
         
-        path = r'datasets/Car-Hacking Dataset/DoS_dataset.csv'
-        df_DoS = dataset_creation_vectorized(path)
-        
-        path = r'datasets/Car-Hacking Dataset/gear_dataset.csv'
-        df_gear = dataset_creation_vectorized(path)
-        
-        path = r'datasets/Car-Hacking Dataset/RPM_dataset.csv'
-        df_RPM = dataset_creation_vectorized(path)
+        df_Fuzzy = dataset_creation_vectorized(fuzzy_path)
+        df_DoS = dataset_creation_vectorized(dos_path)
+        df_gear = dataset_creation_vectorized(gear_path)
+        df_RPM = dataset_creation_vectorized(rpm_path)
         
         list_graphs_fuzzy = create_graphs_numpy(df_Fuzzy, window_size=window_size, stride=stride)
-
         list_graphs_DoS = create_graphs_numpy(df_DoS, window_size=window_size, stride=stride)
-        
         list_graphs_gear = create_graphs_numpy(df_gear, window_size=window_size, stride=stride)
-        
         list_graphs_RPM = create_graphs_numpy(df_RPM, window_size=window_size, stride=stride)
         
         combined_list = list_graphs_fuzzy + list_graphs_DoS + list_graphs_gear + list_graphs_RPM
-        # Create the dataset
         dataset = GraphDataset(combined_list)
 
     
@@ -88,7 +82,7 @@ def window_data_transform_numpy(data):
     """
     # Extract Source, Target, and label columns
     source = data[:, 0]  # Assuming Source is the first column
-    target = data[:, -2]  # Assuming Target is the second column
+    target = data[:, -2]  # Assuming Target is the second to last column
     labels = data[:, -1]  # Assuming label is the last column
 
     # Calculate edge counts for each unique (Source, Target) pair
@@ -134,9 +128,28 @@ def window_data_transform_numpy(data):
 
 
 def hex_to_decimal_vectorized(series):
+    """
+    Takes a pandas series object and recodes hex values to decimal values.
+    
+    Args:
+        series (series): a pandas series object with hex values.
+    
+    Returns:
+        series: A pandas series object with decimal values.
+    """
     return series.apply(lambda x: int(x, 16) if pd.notnull(x) and x != 'None' else None)
 
 def pad_row_vectorized(df):
+    """
+    Transforms a Pandas Dataframe, and where a row has a data length code (DLC)
+    less than 8 will pad the missing columns with a hex code value of '00'.
+    
+    Args:
+        df (pandas Dataframe): A pandas dataframe
+    
+    Returns:
+        df: A pandas dataframe with miss columns padded to '00.
+    """
     mask = df['DLC'] != 8
     for i in range(8, 1, -1):  # Iterate from Data8 to Data1
         mask_label = mask & (df['DLC'] + 1 == i)
@@ -145,6 +158,18 @@ def pad_row_vectorized(df):
     return df.fillna('00')
 
 def dataset_creation_vectorized(path):
+    """
+    Takes a csv file containing CAN data. Creates a pandas dataframe,
+    adds source and target columns, pads the rows with missing values,
+    transforms the hex values to decimal values, and reencodes the labels
+    to a binary classifcation problem of 0 for attack free and 1 for attack.
+    
+    Args:
+        path (string): A string containing the path to a CAN data csv file.
+    
+    Returns:
+        df: a pandas dataframe.
+    """
     df = pd.read_csv(path)
     df.columns = ['Timestamp', 'CAN ID', 'DLC', 'Data1', 'Data2', 'Data3', 'Data4', 'Data5', 'Data6', 'Data7', 'Data8', 'label']
 
