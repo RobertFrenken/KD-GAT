@@ -1,17 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from torch_geometric.loader import DataLoader
 from torch.utils.data import random_split, Subset
 import numpy as np
 import os
 import time
-
 from sklearn.metrics import accuracy_score, f1_score
-
 from preprocessing import graph_creation, GraphDataset
-from models import GATWithJK  # 确保这里有 GATWithJK 的定义
+from models.models import GATWithJK
 
 
 ########################################
