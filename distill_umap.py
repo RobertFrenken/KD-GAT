@@ -197,13 +197,12 @@ def visualize_raw_data_umap(csv_path_list):
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Using device:", device)
-
     # A) 先画“原始数据 UMAP图”，只分 Normal/Attack
     csv_paths = [
-        "D:/quadeer/task1/dataset/Fuzzy_dataset.csv",
-        "D:/quadeer/task1/dataset/DoS_dataset.csv",
-        "D:/quadeer/task1/dataset/gear_dataset.csv",
-        "D:/quadeer/task1/dataset/RPM_dataset.csv"
+        "datasets/Car-Hacking Dataset/Fuzzy_dataset.csv",
+        "datasets/Car-Hacking Dataset/DoS_dataset.csv",
+        "datasets/Car-Hacking Dataset/gear_dataset.csv",
+        "datasets/Car-Hacking Dataset/RPM_dataset.csv"
     ]
     visualize_raw_data_umap(csv_paths)
 
