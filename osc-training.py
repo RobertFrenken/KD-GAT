@@ -94,8 +94,8 @@ def main(config: DictConfig):
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(f"Model Training Runtime: {elapsed_time:.4f} seconds")
-    train_acc = evaluation(train_loader, model, device)
-    test_acc = evaluation(test_loader, model, device)
+    train_acc, train_f1 = evaluation(train_loader, model, device)
+    test_acc, test_f1 = evaluation(test_loader, model, device)
     print(f'Train Accuracy: {train_acc:.4f}, Test Accuracy: {test_acc:.4f}')
 
     torch.save(model.state_dict(), 'final_model.pth')

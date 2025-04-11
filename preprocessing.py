@@ -5,7 +5,19 @@ from torch_geometric.data import Dataset
 from torch_geometric.data import Data
 
 def graph_creation(combined, path, datasize=1.0, window_size=50, stride=50):
+    """
+    Creates a dataset of graphs from a set of CSV files containing CAN data.
     
+    Args:
+        combined (bool): If True, combines multiple datasets into one.
+        path (string): A string containing the path to a CAN data csv file.
+        datasize (float): The size of the dataset to be used. Default is 1.0 (100%).
+        window_size (int): The size of the sliding window.
+        stride (int): The stride for the sliding window.
+    
+    Returns:
+        dataset: Class object GraphDataset pytorch geometric graph datasets.
+    """
     if combined:
         # simple BC where all datasets are combined
         fuzzy_path = r'datasets/Car-Hacking Dataset/Fuzzy_dataset.csv'
