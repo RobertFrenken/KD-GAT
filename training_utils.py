@@ -1,19 +1,4 @@
-import numpy as np # Successfully installed numpy-1.23.5
-import pandas as pd # Successfully installed pandas-1.3.5
-import matplotlib.pyplot as plt
-import seaborn as sns
-import os
-import networkx as nx
-import torch.nn as nn
-import torch.nn.functional as F
-from torch_geometric.nn import GCNConv
-from torch_geometric.loader import DataLoader
-from torch.utils.data import random_split
 import torch
-from torch_geometric.nn import GATConv
-from torch_geometric.data import Dataset
-from torch_geometric.data import Data
-from torch_geometric.nn import global_mean_pool
 
 def evaluation(loader, model, device):
     model.eval()
