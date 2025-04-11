@@ -14,11 +14,13 @@ from omegaconf import DictConfig, OmegaConf
 import wandb
 from models.models import GATBinaryClassifier, GATWithJK
 from preprocessing import GraphDataset, graph_creation
-from training_utils import evaluation, training
+from training_utils import evaluation, training, PyTorchTrainer, PyTorchDistillationTrainer
 WANDB_API_KEY = "02399594f766bc76e4af844217bf8188630cae40"
 @hydra.main(config_path="conf", config_name="base", version_base=None)
 
 def main(config: DictConfig):
+
+    # add hydra instantiation to the script
 
     config_dict = OmegaConf.to_container(config, resolve=True)
     print(config_dict)
@@ -87,18 +89,60 @@ def main(config: DictConfig):
     model_path = 'best_model.pth'
 
     start_time = time.time()
+    # trying with the PyTorchTrainer class
+    trainer = PyTorchTrainer(model, optimizer, criterion, device)
+    # Training loop
+    for epoch in range(EPOCHS):
+        trainer.train_one_epoch(train_loader)
+        trainer.validate(test_loader)
+        
+        # Get metrics
+        metrics = trainer.report_latest_metrics()
+        print(f"Epoch {epoch+1}:")
+        print(f"  Train Loss: {metrics['train']['loss']:.4f}")
+        print(f"  Val Accuracy: {metrics['val']['accuracy']:.2f}")
+
+
+    # Knowledge Distillation Scenario
+    # Initialize models
+    teacher_model = PretrainedModel().eval()  # Frozen model
+    student_model = SmallerModel()
+
+    trainer = PyTorchDistillationTrainer(
+        model=student_model,
+        optimizer=torch.optim.Adam(student_model.parameters()),
+        loss_fn=torch.nn.CrossEntropyLoss(),
+        teacher_model=teacher_model,
+        warmup_epochs=10,
+        alpha=0.3
+    )
+
+    # Training loop
+    for epoch in range(EPOCHS):
+        trainer.train_one_epoch(train_loader)
+        trainer.validate(test_loader)
+        
+        metrics = trainer.report_latest_metrics()
+        if epoch < trainer.warmup_epochs:
+            print(f"Warmup Epoch {epoch+1}: Loss={metrics['train']['loss']:.4f}")
+        else:
+            print(f"Distillation Epoch {epoch+1}:")
+            print(f"  Student Loss: {metrics['train']['student_loss']:.4f}")
+            print(f"  Distill Loss: {metrics['train']['distill_loss']:.4f}")
+
 
     # training loop. Function in training_utils.py
-    training(EPOCHS, model, optimizer, criterion, train_loader, test_loader, device, model_path)
+    # training(EPOCHS, model, optimizer, criterion, train_loader, test_loader, device, model_path)
     
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(f"Model Training Runtime: {elapsed_time:.4f} seconds")
-    train_acc, train_f1 = evaluation(train_loader, model, device)
-    test_acc, test_f1 = evaluation(test_loader, model, device)
-    print(f'Train Accuracy: {train_acc:.4f}, Test Accuracy: {test_acc:.4f}')
-
-    torch.save(model.state_dict(), 'final_model.pth')
+    # train_acc, train_f1 = evaluation(train_loader, model, device)
+    # test_acc, test_f1 = evaluation(test_loader, model, device)
+    # print(f'Train Accuracy: {train_acc:.4f}, Test Accuracy: {test_acc:.4f}')
+    # Access best model
+    model.load_state_dict(trainer.best_model_weights)
+    torch.save(model.state_dict(), 'finaland_best_model.pth')
     
 
 if __name__ == "__main__":
