@@ -14,15 +14,6 @@ from torch_geometric.nn import GATConv
 from torch_geometric.data import Dataset
 from torch_geometric.data import Data
 from torch_geometric.nn import global_mean_pool
-def train(model, optimizer, train_loader, device):
-    model.train()
-    for data in train_loader:
-        data = data.to(device)
-        optimizer.zero_grad()
-        out = model(data).squeeze()  # Squeeze the output to match the target shape
-        loss = F.binary_cross_entropy_with_logits(out, data.y.float())
-        loss.backward()
-        optimizer.step()
 
 def evaluation(loader, model, device):
     model.eval()
@@ -62,11 +53,9 @@ def training(EPOCHS, model, optimizer, criterion, train_loader, test_loader, dev
                 loss = criterion(outputs, data.y.float())
                 val_loss += loss.item()
 
-        
-        
-        print(f'Epoch {epoch+1}, Loss: {loss.item()}')
         val_loss /= len(test_loader)
-        print(f"Epoch {epoch+1}, Validation Loss: {val_loss}")
+        if epoch % 10 == 0:
+            print(f"Epoch {epoch:03d} | Train Loss: {loss.item():.4f} | Val Loss: {val_loss:.4f}")
 
         # Save the best model
         if val_loss < best_val_loss:

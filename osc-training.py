@@ -77,7 +77,7 @@ def main(config: DictConfig):
     print('Size of Training dataloader (samples): ', len(train_loader.dataset))
     print('Size of Testing dataloader (samples): ', len(test_loader.dataset))
 
-    return # exit early for testing
+    
 
     # model = GATBinaryClassifier(in_channels=1, hidden_channels=32, num_heads=16, out_channels=1).to(device)
     # default 3 layers and 4 heads
