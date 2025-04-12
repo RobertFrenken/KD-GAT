@@ -20,6 +20,16 @@ WANDB_API_KEY = "02399594f766bc76e4af844217bf8188630cae40"
 
 def main(config: DictConfig):
 
+    trainer = hydra.utils.instantiate(
+        config.trainer,
+        mode=config.mode,
+        distill_alpha=config.distill_alpha,
+        warmup_epochs=config.warmup_epochs
+    )
+    
+    train_loader = get_dataloader()  # Your data loading function
+    trainer.train(train_loader, cfg.teacher_epochs, cfg.student_epochs)
+
     # add hydra instantiation to the script
 
     config_dict = OmegaConf.to_container(config, resolve=True)

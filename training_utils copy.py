@@ -287,4 +287,179 @@ class TrainingOrchestrator:
         print("Sequential training: Teacher -> Student")
         self.train_teacher(train_loader, teacher_epochs)
         self.train_student(train_loader, student_epochs, teacher=self.teacher)
+#####################################################################
 
+def evaluation(loader, model, device, desc="[Model]", 
+              print_preds=False):
+    """
+    Determines the accuracy of a model on a given dataset using a DataLoader.
+    
+    Args:
+        loader (torch_geometric.loader.DataLoader): DataLoader for the dataset.
+        model (torch.nn.Module): The model to be evaluated.
+        device (torch.device): The device to run the model on.
+        desc (str): Description of the model for logging.
+        
+    Returns:
+        float: The accuracy of the model on the dataset.
+        float: The F1 score of the model on the dataset.
+    """
+    model.eval()
+    all_preds, all_labels = [], []
+    start = time.time()
+    correct = 0
+    with torch.no_grad():
+        for data in loader:
+            data = data.to(device)
+            out = model(data).squeeze()  # Squeeze the output to match the target shape
+            # print(out)
+            pred = (out > 0).long()
+            correct += (pred == data.y).sum().item()
+            all_preds.append(pred.item())
+            all_labels.append(data.y.item())
+    
+    end = time.time()
+    total_time = end - start
+    num_samples = len(loader.dataset)
+    avg_time_ms = (total_time / num_samples) * 1000
+    acc = accuracy_score(all_labels, all_preds)
+    f1  = f1_score(all_labels, all_preds, average='binary')
+    if print_preds:
+        print(f"{desc} Inference Time => Total: {total_time:.2f}s | Avg/sample: {avg_time_ms:.2f} ms")
+    
+    return acc, f1
+
+def training(EPOCHS, model, optimizer, criterion, train_loader, test_loader, device, model_path):
+    """
+    Determines the accuracy of a model on a given dataset using a DataLoader.
+    
+    Args:
+        loader (torch_geometric.loader.DataLoader): DataLoader for the dataset.
+        model (torch.nn.Module): The model to be evaluated.
+        device (torch.device): The device to run the model on.
+        
+    Returns:
+        float: The accuracy of the model on the dataset.
+    """
+    best_val_loss = float('inf')
+
+    for epoch in range(EPOCHS):
+
+        epoch_loss = train_one_epoch(model, train_loader, optimizer, criterion, device)
+        val_epoch_loss = evaluation(test_loader, model, device, desc="[Model]", print_preds=False)
+        # Validation phase
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for data in test_loader:
+                data.to(device)
+                outputs = model(data).squeeze() 
+                loss = criterion(outputs, data.y.float())
+                val_loss += loss.item()
+
+        val_loss /= len(test_loader)
+        if epoch % 10 == 0:
+            print(f"Epoch {epoch:03d} | Train Loss: {loss.item():.4f} | Val Loss: {val_loss:.4f}")
+
+        # Save the best model
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            torch.save(model.state_dict(), model_path)
+            print(f'Best model saved with validation loss: {best_val_loss}')
+
+
+def distill_loss_fn(student_logits, teacher_logits, labels, alpha=0.5, T=2.0):
+    """
+    Calculates the distillation loss using both soft and hard labels.
+    
+    Args:
+        student_logits (torch.Tensor): The logits from the student model.
+        teacher_logits (torch.Tensor): The logits from the teacher model.
+        labels (torch.Tensor): The true labels.
+        alpha (float): The weight for the distillation loss.
+        T (float): The temperature for sigmoid.
+        
+        
+    Returns:
+        torch.Tensor: The combined distillation loss.
+    """
+    # soft label
+    teacher_prob = torch.sigmoid(teacher_logits / T)
+    student_prob = torch.sigmoid(student_logits / T)
+    distill_loss = F.mse_loss(student_prob, teacher_prob)
+
+    # hard label
+    hard_loss = F.binary_cross_entropy_with_logits(student_logits, labels)
+
+    # combine
+    return alpha * distill_loss + (1 - alpha) * hard_loss
+
+
+########################################
+# 2) Distillation single epoch         #
+########################################
+def distill_train_one_epoch(teacher_model, student_model, loader, optimizer, device,
+                            alpha=0.5, temperature=2.0):
+    teacher_model.eval()
+    student_model.train()
+
+    total_loss = 0.0
+    for data in loader:
+        data = data.to(device)
+
+        # teacher forward
+        with torch.no_grad():
+            teacher_out = teacher_model(data)  # => shape=(1,1)
+
+        # student forward
+        student_out = student_model(data)      # => shape=(1,1)
+
+        teacher_logits = teacher_out.view(-1)
+        student_logits = student_out.view(-1)
+        label = data.y.float().to(device).view(-1)
+
+        # distill loss
+        loss = distill_loss_fn(student_logits, teacher_logits, label,
+                               alpha=alpha, T=temperature)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        total_loss += loss.item()
+
+    return total_loss / len(loader)
+
+
+########################################
+# 3) Student pure BCE training         #
+########################################
+# This could probably be merged just training.
+def train_one_epoch(model, loader, optimizer, criterion, device):
+    """
+    Completes the training step of one epoch
+    
+    Args:
+    model (torch.nn.Module): The model to be trained.
+    loader (torch_geometric.loader.DataLoader): DataLoader for the dataset.
+    optimizer (torch.optim.Optimizer): The optimizer for the model.
+    criterion (torch.nn.Module): The loss function.
+    device (torch.device): The device to run the model on.
+        
+    Returns:
+        epoch_loss: The average loss for the epoch.
+    """
+    model.train()
+    running_loss = 0.0
+    for batch in loader:
+        optimizer.zero_grad()
+        batch.to(device) # put batch tensor on the correct device
+        out = model(batch).squeeze()
+        loss = criterion(out, batch.y.float())
+        loss.backward()
+        optimizer.step()
+        
+        running_loss += loss.item() * batch.size(0)  # Multiply by batch size to get total loss for the batch
+
+    epoch_loss = running_loss / len(loader.dataset)  # Average loss over the entire dataset
+    return  epoch_loss
