@@ -184,9 +184,11 @@ class PyTorchDistillationTrainer(PyTorchTrainer):
 
     def report_latest_metrics(self):
         metrics = super().report_latest_metrics()
-        if self.teacher_model and self.current_epoch > self.warmup_epochs:
-            metrics['train']['student_loss'] = self.metrics['train']['student_loss'][-1]
-            metrics['train']['distill_loss'] = self.metrics['train']['distill_loss'][-1]
+        if self.teacher_model and self.current_epoch >= self.warmup_epochs:
+            if self.metrics['train']['student_loss']:
+                metrics['train']['student_loss'] = self.metrics['train']['student_loss'][-1]
+            if self.metrics['train']['distill_loss']:
+                metrics['train']['distill_loss'] = self.metrics['train']['distill_loss'][-1]
         return metrics
 
 class DistillationTrainer:
