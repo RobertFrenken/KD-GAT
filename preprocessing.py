@@ -19,24 +19,22 @@ def graph_creation(combined, path, datasize=1.0, window_size=50, stride=50):
         dataset: Class object GraphDataset pytorch geometric graph datasets.
     """
     if combined:
-        # make a for loop instead of listing all these datasets
-        # simple BC where all datasets are combined
-        fuzzy_path = r'datasets/Car-Hacking Dataset/Fuzzy_dataset.csv'
-        dos_path = r'datasets/Car-Hacking Dataset/DoS_dataset.csv'
-        gear_path = r'datasets/Car-Hacking Dataset/gear_dataset.csv'
-        rpm_path = r'datasets/Car-Hacking Dataset/RPM_dataset.csv'
+        # List of dataset paths
+        dataset_paths = [
+            r'datasets/Car-Hacking Dataset/Fuzzy_dataset.csv',
+            r'datasets/Car-Hacking Dataset/DoS_dataset.csv',
+            r'datasets/Car-Hacking Dataset/gear_dataset.csv',
+            r'datasets/Car-Hacking Dataset/RPM_dataset.csv'
+        ]
         
-        df_Fuzzy = dataset_creation_vectorized(fuzzy_path)
-        df_DoS = dataset_creation_vectorized(dos_path)
-        df_gear = dataset_creation_vectorized(gear_path)
-        df_RPM = dataset_creation_vectorized(rpm_path)
+        # Process each dataset and create graphs
+        combined_list = []
+        for dataset_path in dataset_paths:
+            df = dataset_creation_vectorized(dataset_path)
+            graphs = create_graphs_numpy(df, window_size=window_size, stride=stride)
+            combined_list.extend(graphs)
         
-        list_graphs_fuzzy = create_graphs_numpy(df_Fuzzy, window_size=window_size, stride=stride)
-        list_graphs_DoS = create_graphs_numpy(df_DoS, window_size=window_size, stride=stride)
-        list_graphs_gear = create_graphs_numpy(df_gear, window_size=window_size, stride=stride)
-        list_graphs_RPM = create_graphs_numpy(df_RPM, window_size=window_size, stride=stride)
-        
-        combined_list = list_graphs_fuzzy + list_graphs_DoS + list_graphs_gear + list_graphs_RPM
+        # Create the combined dataset
         dataset = GraphDataset(combined_list)
 
     
@@ -65,20 +63,11 @@ def create_graphs_numpy(data, window_size, stride):
     # Calculate the number of windows
     data = data.to_numpy()  # Convert DataFrame to NumPy array if necessary
     num_windows = (len(data) - window_size) // stride + 1
+    start_indices = range(0, num_windows * stride, stride)
 
-    # Preallocate a list for graphs
-    graphs = []
-
-    # Use NumPy slicing to extract windows
-    for i in range(num_windows):
-        start_idx = i * stride
-        window = data[start_idx:start_idx + window_size]
-
-        # Transform the window into a graph
-        graph = window_data_transform_numpy(window)
-        graphs.append(graph)
-
-    return graphs
+    # list comprehension to create graphs for each window
+    return [window_data_transform_numpy(data[start:start + window_size]) 
+            for start in start_indices]
 
 
 def window_data_transform_numpy(data):
@@ -124,20 +113,11 @@ def window_data_transform_numpy(data):
 
     # Append the node counts as the last feature
     node_features[:, -1] = node_counts
-    # Create node features tensor
+    
     x = torch.tensor(node_features, dtype=torch.float)
-
-    # Create label tensor (binary classification: 1 if any label is 1, else 0)
     y = torch.tensor([1 if 1 in labels else 0], dtype=torch.long)
 
-    # Create the graph data object
-    graph_data = Data(
-        x=x,
-        edge_index=edge_index,
-        edge_attr=edge_attr,
-        y=y
-    )
-    return graph_data
+    return Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y)
 
 
 def hex_to_decimal_vectorized(series):
@@ -150,7 +130,7 @@ def hex_to_decimal_vectorized(series):
     Returns:
         series: A pandas series object with decimal values.
     """
-    return series.apply(lambda x: int(x, 16) if pd.notnull(x) and x != 'None' else None)
+    return pd.to_numeric(series, errors='coerce', downcast='integer', base=16)
 
 def pad_row_vectorized(df):
     """
@@ -184,7 +164,8 @@ def dataset_creation_vectorized(path):
         df: a pandas dataframe.
     """
     df = pd.read_csv(path)
-    df.columns = ['Timestamp', 'CAN ID', 'DLC', 'Data1', 'Data2', 'Data3', 'Data4', 'Data5', 'Data6', 'Data7', 'Data8', 'label']
+    df.columns = ['Timestamp', 'CAN ID', 'DLC', 'Data1', 'Data2', 'Data3', 'Data4', 
+                  'Data5', 'Data6', 'Data7', 'Data8', 'label']
 
     df['Source'] = df['CAN ID']
     df['Target'] = df['CAN ID'].shift(-1)
@@ -193,18 +174,21 @@ def dataset_creation_vectorized(path):
     df = pad_row_vectorized(df)
 
     # Convert hex columns to decimal
-    hex_columns = ['CAN ID', 'Data1', 'Data2', 'Data3', 'Data4', 'Data5', 'Data6', 'Data7', 'Data8', 'Source', 'Target']
+    hex_columns = ['CAN ID', 'Data1', 'Data2', 'Data3', 'Data4', 
+                   'Data5', 'Data6', 'Data7', 'Data8', 'Source', 'Target']
     df[hex_columns] = df[hex_columns].apply(hex_to_decimal_vectorized)
 
-    # Drop the last row
+    # Drop the last row and reencode labels
     df = df.iloc[:-1]
+    df['label'] = df['label'].map({'R': 0, 'T': 1}).fillna(0).astype(int)
 
-    # Reencode the labels
-    df['label'] = df['label'].replace({'R': 0, 'T': 1})
-
-    return df[['CAN ID', 'Data1', 'Data2', 'Data3', 'Data4', 'Data5', 'Data6', 'Data7', 'Data8', 'Source', 'Target', 'label']]
+    return df[['CAN ID', 'Data1', 'Data2', 'Data3', 'Data4', 
+               'Data5', 'Data6', 'Data7', 'Data8', 'Source', 'Target', 'label']]
 
 class GraphDataset(Dataset):
+    """
+    Takes a list of pytorch geometric Data objects and creates a dataset.
+    """
     def __init__(self, data_list):
         self.data_list = data_list
 

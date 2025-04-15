@@ -12,6 +12,7 @@ import time
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import wandb
+import json
 from models.models import GATWithJK
 from preprocessing import graph_creation
 from training_utils import PyTorchTrainer, PyTorchDistillationTrainer, DistillationTrainer
@@ -73,80 +74,43 @@ def main(config: DictConfig):
     print('Size of Training dataloader (samples): ', len(train_loader.dataset))
     print('Size of Testing dataloader (samples): ', len(test_loader.dataset))
 
-    
-    # default 3 layers and 4 heads
-    model = GATWithJK(in_channels=10, hidden_channels=32, out_channels=1).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=LR)
-    criterion = nn.BCEWithLogitsLoss()
-    model_path = 'best_model.pth'
-
-    start_time = time.time()
-    # trying with the PyTorchTrainer class
-    # trainer = PyTorchTrainer(model, optimizer, criterion, device)
-    # # Training loop
-    # for epoch in range(EPOCHS):
-    #     trainer.train_one_epoch(train_loader)
-    #     trainer.validate(test_loader)
-        
-    #     # Get metrics
-    #     metrics = trainer.report_latest_metrics()
-    #     print(f"Epoch {epoch+1}:")
-    #     print(f"  Train Loss: {metrics['train']['loss']:.4f}")
-    #     print(f"  Val Accuracy: {metrics['val']['accuracy']:.2f}")
-
-
     # Knowledge Distillation Scenario
     # Initialize models
     teacher_model = GATWithJK(in_channels=10, hidden_channels=32, out_channels=1, num_layers=5, heads=8).to(device)
     student_model = GATWithJK(in_channels=10, hidden_channels=32, out_channels=1, num_layers=2, heads=4).to(device)
 
-    EPOCHS = 2
     # Initialize the DistillationTrainer
     trainer = DistillationTrainer(
         teacher=teacher_model,
         student=student_model,
         device=device,
         teacher_epochs=EPOCHS,  # Train teacher for 50 epochs
-        student_epochs=EPOCHS,  # Train student for 50 epochs
+        student_epochs=EPOCHS-10,  # Train student for 50 epochs
         distill_alpha=0.5,      # Weight for distillation loss
-        warmup_epochs=10        # Warmup epochs for student training
+        warmup_epochs=10,        # Warmup epochs for student training
+        lr=LR   # Learning rate
     )
 
     # Train teacher first, then student
     print("Starting sequential training...")
     trainer.train_sequential(train_loader)
+    # Save the best teacher model
+    torch.save(trainer.best_teacher_model.state_dict(), 'best_teacher_model.pth')
+    print("Best teacher model saved as 'best_teacher_model.pth'.")
 
     # Save the final student model
     torch.save(student_model.state_dict(), 'final_student_model.pth')
     print("Final student model saved as 'final_student_model.pth'.")
-
-    # Training loop
-    # for epoch in range(EPOCHS):
-    #     trainer.train_one_epoch(train_loader)
-    #     trainer.validate(test_loader)
-        
-    #     metrics = trainer.report_latest_metrics()
-    #     if epoch < trainer.warmup_epochs:
-    #         print(f"Warmup Epoch {epoch+1}: Loss={metrics['train']['loss']:.4f}")
-    #     else:
-    #         print(f"Distillation Epoch {epoch+1}:")
-    #         print(f"  Student Loss: {metrics['train']['student_loss']:.4f}")
-    #         print(f"  Distill Loss: {metrics['train']['distill_loss']:.4f}")
-
-
-    # # training loop. Function in training_utils.py
-    # # training(EPOCHS, model, optimizer, criterion, train_loader, test_loader, device, model_path)
     
-    # end_time = time.time()
-    # elapsed_time = end_time - start_time
-    # print(f"Model Training Runtime: {elapsed_time:.4f} seconds")
-    # # train_acc, train_f1 = evaluation(train_loader, model, device)
-    # # test_acc, test_f1 = evaluation(test_loader, model, device)
-    # # print(f'Train Accuracy: {train_acc:.4f}, Test Accuracy: {test_acc:.4f}')
-    # # Access best model
-    # model.load_state_dict(trainer.best_model_weights)
-    # torch.save(model.state_dict(), 'finaland_best_model.pth')
-    
+    # Save performance metrics
+    metrics = {
+        "teacher_metrics": trainer.teacher_metrics,  # Assuming trainer tracks teacher metrics
+        "student_metrics": trainer.student_metrics   # Assuming trainer tracks student metrics
+    }
+    with open('training_metrics.json', 'w') as f:
+        json.dump(metrics, f, indent=4)
+    print("Training metrics saved as 'training_metrics.json'.")
+
 
 if __name__ == "__main__":
     start_time = time.time()
