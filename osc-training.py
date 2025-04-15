@@ -12,16 +12,15 @@ import time
 import hydra
 from omegaconf import DictConfig, OmegaConf
 import wandb
-from models.models import GATBinaryClassifier, GATWithJK
-from preprocessing import GraphDataset, graph_creation
-from training_utils import PyTorchTrainer, PyTorchDistillationTrainer, DistillationTrainer, TrainingOrchestrator
+from models.models import GATWithJK
+from preprocessing import graph_creation
+from training_utils import PyTorchTrainer, PyTorchDistillationTrainer, DistillationTrainer
 WANDB_API_KEY = "02399594f766bc76e4af844217bf8188630cae40"
 @hydra.main(config_path="conf", config_name="base", version_base=None)
 
 def main(config: DictConfig):
 
     # add hydra instantiation to the script
-
     config_dict = OmegaConf.to_container(config, resolve=True)
     print(config_dict)
 
@@ -30,12 +29,7 @@ def main(config: DictConfig):
     print(f'Model is using device: {device}')
     if device.type == 'cuda':
         print(f"GPU: {torch.cuda.get_device_name(0)}")
-        print(f"Memory allocated: {torch.cuda.memory_allocated(0) / 1e9:.2f} GB")
-        print(f"Memory cached: {torch.cuda.memory_reserved(0) / 1e9:.2f} GB")
     
-    path = r'datasets/Car-Hacking Dataset/Fuzzy_dataset.csv'
-    path = r'datasets/Car-Hacking Dataset/DoS_dataset.csv'
-    path = r'datasets/Car-Hacking Dataset/gear_dataset.csv'
     path = r'datasets/Car-Hacking Dataset/RPM_dataset.csv'
     df = pd.read_csv(path)
     df.columns = ['Timestamp', 'CAN ID','DLC','Data1','Data2','Data3','Data4','Data5','Data6','Data7','Data8', 'label']
@@ -80,8 +74,6 @@ def main(config: DictConfig):
     print('Size of Testing dataloader (samples): ', len(test_loader.dataset))
 
     
-
-    # model = GATBinaryClassifier(in_channels=1, hidden_channels=32, num_heads=16, out_channels=1).to(device)
     # default 3 layers and 4 heads
     model = GATWithJK(in_channels=10, hidden_channels=32, out_channels=1).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
@@ -108,6 +100,7 @@ def main(config: DictConfig):
     teacher_model = GATWithJK(in_channels=10, hidden_channels=32, out_channels=1, num_layers=5, heads=8).to(device)
     student_model = GATWithJK(in_channels=10, hidden_channels=32, out_channels=1, num_layers=2, heads=4).to(device)
 
+    EPOCHS = 2
     # Initialize the DistillationTrainer
     trainer = DistillationTrainer(
         teacher=teacher_model,

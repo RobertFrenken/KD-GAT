@@ -19,6 +19,7 @@ def graph_creation(combined, path, datasize=1.0, window_size=50, stride=50):
         dataset: Class object GraphDataset pytorch geometric graph datasets.
     """
     if combined:
+        # make a for loop instead of listing all these datasets
         # simple BC where all datasets are combined
         fuzzy_path = r'datasets/Car-Hacking Dataset/Fuzzy_dataset.csv'
         dos_path = r'datasets/Car-Hacking Dataset/DoS_dataset.csv'

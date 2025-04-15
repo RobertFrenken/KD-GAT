@@ -1,0 +1,10 @@
+epochs: 2
+lr: 0.0005
+train_ratio: 0.8
+combined: false
+batch_size: 32
+momentum: 0.9
+datasize: 1.0
+optimizer: torch.optim.SGD
+_target_: trainers.DistillationTrainer
+device: cuda

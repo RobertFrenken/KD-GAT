@@ -128,16 +128,17 @@ class PyTorchDistillationTrainer(PyTorchTrainer):
         all_preds, all_targets = [], []
         
         for batch in train_loader:
-            inputs, targets = batch[0].to(self.device), batch[1].to(self.device)
+            batch = batch.to(self.device)
+            targets = batch.y.float()
             self.optimizer.zero_grad()
             
             # Forward pass
-            student_outputs = self.model(inputs)
+            student_outputs = self.model(batch).squeeze()
             
             if self.teacher_model and self.current_epoch >= self.warmup_epochs:
                 # Distillation phase
                 with torch.no_grad():
-                    teacher_outputs = self.teacher_model(inputs)
+                    teacher_outputs = self.teacher_model(batch)
                 
                 # Calculate combined loss
                 student_loss = self.loss_fn(student_outputs, targets)
@@ -148,12 +149,12 @@ class PyTorchDistillationTrainer(PyTorchTrainer):
                 loss = (1 - self.alpha) * student_loss + self.alpha * distill_loss
                 
                 # Track both losses
-                epoch_student_loss += student_loss.item() * inputs.size(0)
-                epoch_distill_loss += distill_loss.item() * inputs.size(0)
+                epoch_student_loss += student_loss.item() * batch.size(0)
+                epoch_distill_loss += distill_loss.item() * batch.size(0)
             else:
                 # Warmup phase or normal training
                 loss = self.loss_fn(student_outputs, targets)
-                epoch_student_loss += loss.item() * inputs.size(0)
+                epoch_student_loss += loss.item() * batch.size(0)
                 epoch_distill_loss = 0  # Not applicable
             
             # Backward pass
@@ -245,21 +246,4 @@ class DistillationTrainer:
         print("Training student model...")
         self.train_student(train_loader)
 
-class TrainingOrchestrator:
-    def __init__(self, teacher_model=None, student_model=None, device="cuda", **kwargs):
-        self.trainer = DistillationTrainer(
-            student=student_model,
-            teacher=teacher_model,
-            device=device,
-            **kwargs
-        )
-
-    def train_teacher(self, train_loader):
-        self.trainer.train_teacher(train_loader)
-
-    def train_student(self, train_loader):
-        self.trainer.train_student(train_loader)
-
-    def train_sequential(self, train_loader):
-        self.trainer.train_sequential(train_loader)
 
