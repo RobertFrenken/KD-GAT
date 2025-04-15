@@ -214,6 +214,7 @@ class DistillationTrainer:
         
         for epoch in range(self.teacher_epochs):
             teacher_trainer.train_one_epoch(train_loader)
+            teacher_trainer.validate(train_loader)  # Add validation step here
             metrics = teacher_trainer.report_latest_metrics()
             print(f"Teacher Epoch {epoch+1} | Loss: {metrics['train']['loss']:.4f}")
 
@@ -231,6 +232,7 @@ class DistillationTrainer:
         
         for epoch in range(self.student_epochs):
             student_trainer.train_one_epoch(train_loader)
+            student_trainer.validate(train_loader)
             metrics = student_trainer.report_latest_metrics()
             print(f"Student Epoch {epoch+1} | Loss: {metrics['train']['loss']:.4f} | Acc: {metrics['train']['accuracy']:.2f}")
 
