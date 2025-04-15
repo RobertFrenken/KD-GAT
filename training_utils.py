@@ -189,102 +189,75 @@ class PyTorchDistillationTrainer(PyTorchTrainer):
         return metrics
 
 class DistillationTrainer:
-    def __init__(self, student, teacher, device="cuda", **kwargs):
-        self.student = hydra.utils.instantiate(student).to(device)
-        self.teacher = hydra.utils.instantiate(teacher).to(device) if teacher else None
+    def __init__(self, student, teacher=None, device="cuda", **kwargs):
+        self.student = student.to(device)
+        self.teacher = teacher.to(device) if teacher else None
         self.device = device
         
-        # Initialize from config
-        self.mode = kwargs.get('mode', 'sequential')
+        # Distillation-specific parameters
         self.distill_alpha = kwargs.get('distill_alpha', 0.5)
         self.warmup_epochs = kwargs.get('warmup_epochs', 5)
+        self.teacher_epochs = kwargs.get('teacher_epochs', 10)
+        self.student_epochs = kwargs.get('student_epochs', 20)
 
-    def train(self, train_loader, teacher_epochs=10, student_epochs=20):
-        if self.mode in ['teacher', 'sequential']:
-            self._train_teacher(train_loader, teacher_epochs)
-            
-        if self.mode in ['student', 'sequential']:
-            self._train_student(train_loader, student_epochs)
-
-    def _train_teacher(self, train_loader, epochs):
-        optimizer = torch.optim.Adam(self.teacher.parameters())
-        criterion = torch.nn.CrossEntropyLoss()
+    def train_teacher(self, train_loader):
+        """Train the teacher model using PyTorchTrainer."""
+        if not self.teacher:
+            raise ValueError("Teacher model is not defined.")
         
-        for epoch in range(epochs):
-            # Standard training loop
-            self.teacher.train()
-            for batch in train_loader:
-                inputs, targets = batch[0].to(self.device), batch[1].to(self.device)
-                optimizer.zero_grad()
-                outputs = self.teacher(inputs)
-                loss = criterion(outputs, targets)
-                loss.backward()
-                optimizer.step()
-
-    def _train_student(self, train_loader, epochs):
-        optimizer = torch.optim.Adam(self.student.parameters())
-        criterion = torch.nn.CrossEntropyLoss()
-        distill_loss = torch.nn.KLDivLoss(reduction='batchmean')
-        
-        for epoch in range(epochs):
-            self.student.train()
-            if self.teacher: 
-                self.teacher.eval()
-            
-            for batch in train_loader:
-                inputs, targets = batch[0].to(self.device), batch[1].to(self.device)
-                optimizer.zero_grad()
-                
-                student_out = self.student(inputs)
-                
-                if self.teacher and epoch >= self.warmup_epochs:
-                    with torch.no_grad():
-                        teacher_out = self.teacher(inputs)
-                    
-                    loss = (1-self.distill_alpha)*criterion(student_out, targets) + \
-                           self.distill_alpha*distill_loss(
-                               torch.log_softmax(student_out, dim=1),
-                               torch.softmax(teacher_out, dim=1)
-                           )
-                else:
-                    loss = criterion(student_out, targets)
-                
-                loss.backward()
-                optimizer.step()
-
-class TrainingOrchestrator:
-    def __init__(self, teacher_model=None, student_model=None):
-        self.teacher = teacher_model
-        self.student = student_model
-        
-    def train_teacher(self, train_loader, epochs, **kwargs):
-        print("Training teacher model...")
         teacher_trainer = PyTorchTrainer(
             model=self.teacher,
             optimizer=torch.optim.Adam(self.teacher.parameters()),
-            loss_fn=torch.nn.CrossEntropyLoss()
+            loss_fn=torch.nn.BCEWithLogitsLoss(),
+            device=self.device
         )
         
-        for epoch in range(epochs):
+        for epoch in range(self.teacher_epochs):
             teacher_trainer.train_one_epoch(train_loader)
-            print(f"Teacher Epoch {epoch+1} Loss: {teacher_trainer.report_latest_metrics()['train']['loss']:.4f}")
+            metrics = teacher_trainer.report_latest_metrics()
+            print(f"Teacher Epoch {epoch+1} | Loss: {metrics['train']['loss']:.4f}")
 
-    def train_student(self, train_loader, epochs, teacher=None, **kwargs):
-        print("Training student model...")
+    def train_student(self, train_loader):
+        """Train the student model using PyTorchDistillationTrainer."""
         student_trainer = PyTorchDistillationTrainer(
             model=self.student,
             optimizer=torch.optim.Adam(self.student.parameters()),
-            loss_fn=torch.nn.CrossEntropyLoss(),
-            teacher_model=teacher
+            loss_fn=torch.nn.BCEWithLogitsLoss(),
+            teacher_model=self.teacher,
+            warmup_epochs=self.warmup_epochs,
+            alpha=self.distill_alpha,
+            device=self.device
         )
         
-        for epoch in range(epochs):
+        for epoch in range(self.student_epochs):
             student_trainer.train_one_epoch(train_loader)
             metrics = student_trainer.report_latest_metrics()
             print(f"Student Epoch {epoch+1} | Loss: {metrics['train']['loss']:.4f} | Acc: {metrics['train']['accuracy']:.2f}")
 
-    def train_sequential(self, train_loader, teacher_epochs, student_epochs, **kwargs):
-        print("Sequential training: Teacher -> Student")
-        self.train_teacher(train_loader, teacher_epochs)
-        self.train_student(train_loader, student_epochs, teacher=self.teacher)
+    def train_sequential(self, train_loader):
+        """Train the teacher first, then the student."""
+        if self.teacher:
+            print("Training teacher model...")
+            self.train_teacher(train_loader)
+        
+        print("Training student model...")
+        self.train_student(train_loader)
+
+class TrainingOrchestrator:
+    def __init__(self, teacher_model=None, student_model=None, device="cuda", **kwargs):
+        self.trainer = DistillationTrainer(
+            student=student_model,
+            teacher=teacher_model,
+            device=device,
+            **kwargs
+        )
+
+    def train_teacher(self, train_loader):
+        self.trainer.train_teacher(train_loader)
+
+    def train_student(self, train_loader):
+        self.trainer.train_student(train_loader)
+
+    def train_sequential(self, train_loader):
+        self.trainer.train_sequential(train_loader)
 
