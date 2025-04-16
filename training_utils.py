@@ -116,8 +116,8 @@ class PyTorchTrainer:
 
     def report_latest_metrics(self):
         return {
-            'train': {k: v[-1] for k, v in self.metrics['train'].items()},
-            'val': {k: v[-1] for k, v in self.metrics['val'].items()}
+        'train': {k: (v[-1] if v else None) for k, v in self.metrics['train'].items()},
+        'val': {k: (v[-1] if v else None) for k, v in self.metrics['val'].items()}
         }
 
 class PyTorchDistillationTrainer(PyTorchTrainer):
@@ -188,8 +188,8 @@ class PyTorchDistillationTrainer(PyTorchTrainer):
         # Update metrics
         total_samples = len(train_loader.dataset)
         self.metrics['train']['student_loss'].append(epoch_student_loss / total_samples)
-        if self.teacher_model and self.current_epoch >= self.warmup_epochs:
-            self.metrics['train']['distill_loss'].append(epoch_distill_loss / total_samples)
+        self.metrics['train']['distill_loss'].append(epoch_distill_loss / total_samples) 
+        self.metrics['train']['student_loss'].append(epoch_student_loss / total_samples)
         
         self._update_metrics('train', 
                             (epoch_student_loss + epoch_distill_loss) / total_samples,
@@ -221,6 +221,7 @@ class DistillationTrainer:
         self.warmup_epochs = kwargs.get('warmup_epochs', 5)
         self.teacher_epochs = kwargs.get('teacher_epochs', 10)
         self.student_epochs = kwargs.get('student_epochs', 20)
+        self.lr = kwargs.get('lr', 0.0001)
 
     def train_teacher(self, train_loader):
         """Train the teacher model using PyTorchTrainer."""
@@ -229,7 +230,7 @@ class DistillationTrainer:
         
         teacher_trainer = PyTorchTrainer(
             model=self.teacher,
-            optimizer=torch.optim.Adam(self.teacher.parameters()),
+            optimizer=torch.optim.Adam(self.teacher.parameters(), lr=self.lr),
             loss_fn=torch.nn.BCEWithLogitsLoss(),
             device=self.device
         )
@@ -252,7 +253,7 @@ class DistillationTrainer:
         """Train the student model using PyTorchDistillationTrainer."""
         student_trainer = PyTorchDistillationTrainer(
             model=self.student,
-            optimizer=torch.optim.Adam(self.student.parameters()),
+            optimizer=torch.optim.Adam(self.student.parameters(), lr=self.lr),
             loss_fn=torch.nn.BCEWithLogitsLoss(),
             teacher_model=self.teacher,
             warmup_epochs=self.warmup_epochs,
