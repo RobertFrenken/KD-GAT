@@ -8,6 +8,25 @@ from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_sc
 from preprocessing import graph_creation, GraphDataset
 from models.models import GATWithJK
 import hydra
+
+#########################################
+# 0) Distillation Loss Function         #
+#########################################
+def distillation_loss_fn(student_logits, teacher_logits, T=5.0):
+    """
+    Compute the distillation loss with temperature scaling.
+    """
+    # Clamp logits to prevent numerical instability
+    teacher_logits = torch.clamp(teacher_logits, -10, 10)
+    student_logits = torch.clamp(student_logits, -10, 10)
+
+    # Compute softmax probabilities with temperature scaling
+    teacher_prob = F.softmax(teacher_logits / T, dim=-1)
+    student_log_prob = F.log_softmax(student_logits / T, dim=-1)
+
+    # KL divergence loss
+    distill_loss = F.kl_div(student_log_prob, teacher_prob, reduction='batchmean') * (T * T)
+    return distill_loss
 #########################################
 # 1) PyTorch Trainer Class              #
 #########################################
@@ -103,7 +122,7 @@ class PyTorchTrainer:
 
 class PyTorchDistillationTrainer(PyTorchTrainer):
     def __init__(self, model, optimizer, loss_fn, device="cuda",
-                 teacher_model=None, warmup_epochs=5, alpha=0.5,
+                 teacher_model=None, warmup_epochs=5, alpha=0.1,
                  distillation_loss_fn=torch.nn.KLDivLoss(reduction='batchmean')):
         super().__init__(model, optimizer, loss_fn, device)
         
@@ -140,12 +159,12 @@ class PyTorchDistillationTrainer(PyTorchTrainer):
                 with torch.no_grad():
                     teacher_outputs = self.teacher_model(batch)
                 
+                teacher_logits = teacher_outputs.view(-1)
+                student_logits = student_outputs.view(-1)
                 # Calculate combined loss
                 student_loss = self.loss_fn(student_outputs, targets)
-                distill_loss = self.distillation_loss_fn(
-                    torch.log_softmax(student_outputs, dim=-1),
-                    torch.softmax(teacher_outputs, dim=-1)
-                )
+                # Distillation loss
+                distill_loss = distillation_loss_fn(student_logits, teacher_logits, T=5.0)
                 loss = (1 - self.alpha) * student_loss + self.alpha * distill_loss
                 
                 # Track both losses
@@ -214,12 +233,20 @@ class DistillationTrainer:
             loss_fn=torch.nn.BCEWithLogitsLoss(),
             device=self.device
         )
+
+        self.best_teacher_model = None  # Initialize best_teacher_model
+        best_val_loss = float('inf')  # Track the best validation loss
         
         for epoch in range(self.teacher_epochs):
             teacher_trainer.train_one_epoch(train_loader)
             teacher_trainer.validate(train_loader)  # Add validation step here
             metrics = teacher_trainer.report_latest_metrics()
             print(f"Teacher Epoch {epoch+1} | Loss: {metrics['train']['loss']:.4f}")
+
+            # Save the best teacher model
+            if teacher_trainer.best_val_loss < best_val_loss:
+                best_val_loss = teacher_trainer.best_val_loss
+                self.best_teacher_model = teacher_trainer.model.state_dict().copy()
 
     def train_student(self, train_loader):
         """Train the student model using PyTorchDistillationTrainer."""
