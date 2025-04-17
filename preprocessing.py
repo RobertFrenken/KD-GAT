@@ -130,7 +130,7 @@ def hex_to_decimal_vectorized(series):
     Returns:
         series: A pandas series object with decimal values.
     """
-    return pd.to_numeric(series, errors='coerce', downcast='integer', base=16)
+    return series.apply(lambda x: int(x, 16) if pd.notnull(x) else None)
 
 def pad_row_vectorized(df):
     """

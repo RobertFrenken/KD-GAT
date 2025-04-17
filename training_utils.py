@@ -145,6 +145,8 @@ class PyTorchDistillationTrainer(PyTorchTrainer):
         epoch_student_loss = 0
         epoch_distill_loss = 0
         all_preds, all_targets = [], []
+        if self.current_epoch == self.warmup_epochs:
+                    print(f"Transitioning to knowledge distillation at epoch {self.current_epoch}...")
         
         for batch in train_loader:
             batch = batch.to(self.device)
@@ -189,12 +191,11 @@ class PyTorchDistillationTrainer(PyTorchTrainer):
         total_samples = len(train_loader.dataset)
         self.metrics['train']['student_loss'].append(epoch_student_loss / total_samples)
         self.metrics['train']['distill_loss'].append(epoch_distill_loss / total_samples) 
-        self.metrics['train']['student_loss'].append(epoch_student_loss / total_samples)
         
         self._update_metrics('train', 
                             (epoch_student_loss + epoch_distill_loss) / total_samples,
                             all_preds, all_targets)
-        
+        # print(f"Metrics after epoch {self.current_epoch}: {self.metrics}")
         self.current_epoch += 1
 
     def validate(self, val_loader):
@@ -222,6 +223,9 @@ class DistillationTrainer:
         self.teacher_epochs = kwargs.get('teacher_epochs', 10)
         self.student_epochs = kwargs.get('student_epochs', 20)
         self.lr = kwargs.get('lr', 0.0001)
+        # Initialize metrics for teacher and student
+        self.teacher_metrics = {"loss": [], "accuracy": []}  # Add other metrics as needed
+        self.student_metrics = {"loss": [], "accuracy": []}  # Add other metrics as needed
 
     def train_teacher(self, train_loader):
         """Train the teacher model using PyTorchTrainer."""
@@ -242,7 +246,7 @@ class DistillationTrainer:
             teacher_trainer.train_one_epoch(train_loader)
             teacher_trainer.validate(train_loader)  # Add validation step here
             metrics = teacher_trainer.report_latest_metrics()
-            print(f"Teacher Epoch {epoch+1} | Loss: {metrics['train']['loss']:.4f}")
+            print(f"Teacher Epoch {epoch+1} | Loss: {metrics['train']['loss']:.4f} | Acc: {metrics['train']['accuracy']:.2f}")
 
             # Save the best teacher model
             if teacher_trainer.best_val_loss < best_val_loss:

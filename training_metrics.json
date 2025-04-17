@@ -1,0 +1,10 @@
+{
+    "teacher_metrics": {
+        "loss": [],
+        "accuracy": []
+    },
+    "student_metrics": {
+        "loss": [],
+        "accuracy": []
+    }
+}

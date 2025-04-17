@@ -85,17 +85,18 @@ def main(config: DictConfig):
         student=student_model,
         device=device,
         teacher_epochs=EPOCHS,  # Train teacher for 50 epochs
-        student_epochs=EPOCHS-10,  # Train student for 50 epochs
+        student_epochs=EPOCHS,  # Train student for 50 epochs
         distill_alpha=0.5,      # Weight for distillation loss
-        warmup_epochs=10,        # Warmup epochs for student training
+        warmup_epochs=5,        # Warmup epochs for student training
         lr=LR   # Learning rate
     )
 
+    
     # Train teacher first, then student
     print("Starting sequential training...")
     trainer.train_sequential(train_loader)
     # Save the best teacher model
-    torch.save(trainer.best_teacher_model.state_dict(), 'best_teacher_model.pth')
+    torch.save(trainer.best_teacher_model, 'best_teacher_model.pth')
     print("Best teacher model saved as 'best_teacher_model.pth'.")
 
     # Save the final student model
@@ -107,6 +108,7 @@ def main(config: DictConfig):
         "teacher_metrics": trainer.teacher_metrics,  # Assuming trainer tracks teacher metrics
         "student_metrics": trainer.student_metrics   # Assuming trainer tracks student metrics
     }
+    print(metrics)
     with open('training_metrics.json', 'w') as f:
         json.dump(metrics, f, indent=4)
     print("Training metrics saved as 'training_metrics.json'.")
