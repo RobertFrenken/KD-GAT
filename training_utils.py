@@ -227,7 +227,7 @@ class DistillationTrainer:
         self.teacher_metrics = {"loss": [], "accuracy": []}  # Add other metrics as needed
         self.student_metrics = {"loss": [], "accuracy": []}  # Add other metrics as needed
 
-    def train_teacher(self, train_loader):
+    def train_teacher(self, train_loader, test_loader=None):
         """Train the teacher model using PyTorchTrainer."""
         if not self.teacher:
             raise ValueError("Teacher model is not defined.")
@@ -244,16 +244,19 @@ class DistillationTrainer:
         
         for epoch in range(self.teacher_epochs):
             teacher_trainer.train_one_epoch(train_loader)
-            teacher_trainer.validate(train_loader)  # Add validation step here
-            metrics = teacher_trainer.report_latest_metrics()
-            print(f"Teacher Epoch {epoch+1} | Loss: {metrics['train']['loss']:.4f} | Acc: {metrics['train']['accuracy']:.2f}")
+            teacher_trainer.validate(test_loader)
+            metrics_train = teacher_trainer.report_latest_metrics()['train']
+            metrics_test = teacher_trainer.report_latest_metrics()['val']
+            print(f"Teacher Epoch {epoch+1} | Train Loss: {metrics_train['loss']:.4f} | Train Acc: {metrics_train['accuracy']:.4f} | "
+              f"Test Loss: {metrics_test['loss']:.4f} | Test Acc: {metrics_test['accuracy']:.4f}")
+            
 
             # Save the best teacher model
             if teacher_trainer.best_val_loss < best_val_loss:
                 best_val_loss = teacher_trainer.best_val_loss
                 self.best_teacher_model = teacher_trainer.model.state_dict().copy()
 
-    def train_student(self, train_loader):
+    def train_student(self, train_loader, test_loader=None):
         """Train the student model using PyTorchDistillationTrainer."""
         student_trainer = PyTorchDistillationTrainer(
             model=self.student,
@@ -267,17 +270,19 @@ class DistillationTrainer:
         
         for epoch in range(self.student_epochs):
             student_trainer.train_one_epoch(train_loader)
-            student_trainer.validate(train_loader)
-            metrics = student_trainer.report_latest_metrics()
-            print(f"Student Epoch {epoch+1} | Loss: {metrics['train']['loss']:.4f} | Acc: {metrics['train']['accuracy']:.2f}")
-
-    def train_sequential(self, train_loader):
+            student_trainer.validate(test_loader) 
+            metrics_train = student_trainer.report_latest_metrics()['train']
+            metrics_test = student_trainer.report_latest_metrics()['val']
+            print(f"Student Epoch {epoch+1} | Train Loss: {metrics_train['loss']:.4f} | Train Acc: {metrics_train['accuracy']:.4f} | "
+              f"Test Loss: {metrics_test['loss']:.4f} | Test Acc: {metrics_test['accuracy']:.4f}")
+            
+    def train_sequential(self, train_loader, test_loader=None):
         """Train the teacher first, then the student."""
         if self.teacher:
             print("Training teacher model...")
-            self.train_teacher(train_loader)
+            self.train_teacher(train_loader, test_loader)
         
         print("Training student model...")
-        self.train_student(train_loader)
+        self.train_student(train_loader, test_loader)
 
 

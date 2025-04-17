@@ -94,7 +94,7 @@ def main(config: DictConfig):
     
     # Train teacher first, then student
     print("Starting sequential training...")
-    trainer.train_sequential(train_loader)
+    trainer.train_sequential(train_loader, test_loader)
     # Save the best teacher model
     torch.save(trainer.best_teacher_model, 'best_teacher_model.pth')
     print("Best teacher model saved as 'best_teacher_model.pth'.")
