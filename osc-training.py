@@ -30,16 +30,18 @@ def main(config: DictConfig):
     print(f'Model is using device: {device}')
     if device.type == 'cuda':
         print(f"GPU: {torch.cuda.get_device_name(0)}")
+
+    root_folders = [r"datasets/can-train-and-test-v1.5/hcrl-ch",
+                    r"datasets/can-train-and-test-v1.5/hcrl-sa",
+                    r"datasets/can-train-and-test-v1.5/set_01",
+                    ]
+
+    root_folder = r"datasets/can-train-and-test-v1.5/hcrl-ch"
+    dataset = graph_creation(root_folder)
+    print(f"Number of graphs: {len(dataset)}")
     
-    path = r'datasets/Car-Hacking Dataset/RPM_dataset.csv'
-    df = pd.read_csv(path)
-    df.columns = ['Timestamp', 'CAN ID','DLC','Data1','Data2','Data3','Data4','Data5','Data6','Data7','Data8', 'label']
-    combined = config_dict['combined']
-    DATASIZE = config_dict['datasize']
-
-    dataset = graph_creation(combined, path, window_size=50, stride=50)
-
     # hyperparameters from yaml file
+    DATASIZE = config_dict['datasize']
     EPOCHS = config_dict['epochs']
     LR = config_dict['lr']
     BATCH_SIZE = config_dict['batch_size']

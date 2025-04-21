@@ -4,6 +4,7 @@ import torch
 from torch_geometric.data import Dataset
 from torch_geometric.data import Data
 import os
+import unittest
 
 def graph_creation(root_folder, window_size=50, stride=50):
     """
@@ -22,7 +23,7 @@ def graph_creation(root_folder, window_size=50, stride=50):
     # Find all CSV files in folders with 'train' in their name
     train_csv_files = []
     for dirpath, dirnames, filenames in os.walk(root_folder):
-        if 'train' in dirpath.lower():  # Check if 'train' is in the folder name
+        if 'train_' in dirpath.lower():  # Check if 'train_' is in the folder name
             for filename in filenames:
                 if filename.endswith('.csv'):  # Only include CSV files
                     train_csv_files.append(os.path.join(dirpath, filename))
@@ -176,7 +177,8 @@ def dataset_creation_vectorized(path):
     hex_columns = ['CAN ID', 'Data1', 'Data2', 'Data3', 'Data4', 
                    'Data5', 'Data6', 'Data7', 'Data8', 'Source', 'Target']
     # Convert hex values to decimal
-    df[hex_columns] = df[hex_columns].apply(lambda x: int(x, 16) if pd.notnull(x) else None)
+    for col in hex_columns:
+        df[col] = df[col].apply(lambda x: int(x, 16) if pd.notnull(x) else None)
 
     # Drop the last row and reencode labels
     df = df.iloc[:-1]
@@ -200,13 +202,21 @@ class GraphDataset(Dataset):
     def __getitem__(self, idx):
         return self.data_list[idx]
 
-if __name__ == "__main__":
-    # Example test for dataset_creation_vectorized
-    test_path = r"datasets/can-train-and-test-v1.5/hcrl-ch/train_02_with_attacks/fuzzing-train.csv"
-    df = dataset_creation_vectorized(test_path)
-    print(df.head())  # Print the first few rows to verify the output
+#################################
+# Testing Class                 #
+#################################
+class TestPreprocessing(unittest.TestCase):
+    def test_dataset_creation_vectorized(self):
+        test_path = r"datasets/can-train-and-test-v1.5/hcrl-ch/train_02_with_attacks/fuzzing-train.csv"
+        df = dataset_creation_vectorized(test_path)
+        self.assertEqual(len(df.columns), 12)  # Check if the correct number of columns exists
+        self.assertTrue('label' in df.columns)  # Check if 'label' column exists
 
-    # Example test for graph_creation
-    root_folder = r"datasets/can-train-and-test-v1.5/hcrl-ch"
-    graph_dataset = graph_creation(root_folder, combined=False, dataset_path=None, dataset_type="type1")
-    print(f"Number of graphs: {len(graph_dataset)}")
+    def test_graph_creation(self):
+        root_folder = r"datasets/can-train-and-test-v1.5/hcrl-ch"
+        graph_dataset = graph_creation(root_folder)
+        self.assertGreater(len(graph_dataset), 0)  # Ensure graphs are created
+
+
+if __name__ == "__main__":
+    unittest.main()
