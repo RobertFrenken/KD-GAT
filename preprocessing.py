@@ -3,8 +3,9 @@ import pandas as pd # Successfully installed pandas-1.3.5
 import torch
 from torch_geometric.data import Dataset
 from torch_geometric.data import Data
+import os
 
-def graph_creation(combined, path, datasize=1.0, window_size=50, stride=50):
+def graph_creation(root_folder, window_size=50, stride=50):
     """
     Creates a dataset of graphs from a set of CSV files containing CAN data.
     
@@ -18,32 +19,24 @@ def graph_creation(combined, path, datasize=1.0, window_size=50, stride=50):
     Returns:
         dataset: Class object GraphDataset pytorch geometric graph datasets.
     """
-    if combined:
-        # List of dataset paths
-        dataset_paths = [
-            r'datasets/Car-Hacking Dataset/Fuzzy_dataset.csv',
-            r'datasets/Car-Hacking Dataset/DoS_dataset.csv',
-            r'datasets/Car-Hacking Dataset/gear_dataset.csv',
-            r'datasets/Car-Hacking Dataset/RPM_dataset.csv'
-        ]
-        
-        # Process each dataset and create graphs
-        combined_list = []
-        for dataset_path in dataset_paths:
-            df = dataset_creation_vectorized(dataset_path)
-            graphs = create_graphs_numpy(df, window_size=window_size, stride=stride)
-            combined_list.extend(graphs)
-        
-        # Create the combined dataset
-        dataset = GraphDataset(combined_list)
-
+    # Find all CSV files in folders with 'train' in their name
+    train_csv_files = []
+    for dirpath, dirnames, filenames in os.walk(root_folder):
+        if 'train' in dirpath.lower():  # Check if 'train' is in the folder name
+            for filename in filenames:
+                if filename.endswith('.csv'):  # Only include CSV files
+                    train_csv_files.append(os.path.join(dirpath, filename))
     
-    else:
-        arr = dataset_creation_vectorized(path)
-        list_graphs = create_graphs_numpy(arr, window_size=50, stride=50)
-        # Create the dataset
-        dataset = GraphDataset(list_graphs)
+    # Process each CSV file and create graphs
+    combined_list = []
+    for csv_file in train_csv_files:
+        print(f"Processing file: {csv_file}")
+        df = dataset_creation_vectorized(csv_file)
+        graphs = create_graphs_numpy(df, window_size=window_size, stride=stride)
+        combined_list.extend(graphs)
 
+    # Create the combined dataset
+    dataset = GraphDataset(combined_list)
     return dataset
 
 def create_graphs_numpy(data, window_size, stride):
@@ -119,37 +112,30 @@ def window_data_transform_numpy(data):
 
     return Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y)
 
-
-def hex_to_decimal_vectorized(series):
-    """
-    Takes a pandas series object and recodes hex values to decimal values.
-    
-    Args:
-        series (series): a pandas series object with hex values.
-    
-    Returns:
-        series: A pandas series object with decimal values.
-    """
-    return series.apply(lambda x: int(x, 16) if pd.notnull(x) else None)
-
 def pad_row_vectorized(df):
     """
-    Transforms a Pandas Dataframe, and where a row has a data length code (DLC)
-    less than 8 will pad the missing columns with a hex code value of '00'.
-    
-    Args:
-        df (pandas Dataframe): A pandas dataframe
-    
-    Returns:
-        df: A pandas dataframe with miss columns padded to '00.
-    """
-    mask = df['DLC'] != 8
-    for i in range(8, 1, -1):  # Iterate from Data8 to Data1
-        mask_label = mask & (df['DLC'] + 1 == i)
-        df.loc[mask_label, 'label'] = df.loc[mask_label, f'Data{i}']
-        df.loc[mask_label, f'Data{i}'] = '00'
-    return df.fillna('00')
+    Pads rows in a Pandas DataFrame where the data length code (DLC) is less than 8
+    by filling missing columns with a hex code value of '00'.
 
+    Args:
+        df (pandas.DataFrame): A pandas DataFrame.
+
+    Returns:
+        df: A pandas DataFrame with missing columns padded to '00'.
+    """
+    # Create a mask for rows where DLC is less than 8
+    mask = df['DLC'] < 8
+
+    # Iterate over the range of Data1 to Data8 columns
+    for i in range(8):
+        # Only pad columns where the index is greater than or equal to the DLC
+        column_name = f'Data{i+1}'
+        df.loc[mask & (df['DLC'] <= i), column_name] = '00'
+
+    # Fill any remaining NaN values with '00'
+    df.fillna('00', inplace=True)
+
+    return df
 def dataset_creation_vectorized(path):
     """
     Takes a csv file containing CAN data. Creates a pandas dataframe,
@@ -164,8 +150,21 @@ def dataset_creation_vectorized(path):
         df: a pandas dataframe.
     """
     df = pd.read_csv(path)
-    df.columns = ['Timestamp', 'CAN ID', 'DLC', 'Data1', 'Data2', 'Data3', 'Data4', 
-                  'Data5', 'Data6', 'Data7', 'Data8', 'label']
+    df.columns = ['Timestamp', 'arbitration_id', 'data_field', 'attack']
+    df.rename(columns={'arbitration_id': 'CAN ID'}, inplace=True)
+
+    # Add the DLC column based on the length of the data_field
+    df['DLC'] = df['data_field'].apply(lambda x: len(x) // 2)
+
+    # Unpack the data_field column into individual bytes
+    df['data_field'] = df['data_field'].astype(str).str.strip()  # Ensure it's a string and strip whitespace
+    df['bytes'] = df['data_field'].apply(lambda x: [x[i:i+2] for i in range(0, len(x), 2)])  # Split into bytes
+
+    # Determine the maximum number of bytes (should be 8 or fewer)
+    max_bytes = 8
+    # Create Data1 to Data8 columns, padding with '00' if fewer than 8 bytes
+    for i in range(max_bytes):
+        df[f'Data{i+1}'] = df['bytes'].apply(lambda x: x[i] if i < len(x) else '00')
 
     df['Source'] = df['CAN ID']
     df['Target'] = df['CAN ID'].shift(-1)
@@ -176,11 +175,14 @@ def dataset_creation_vectorized(path):
     # Convert hex columns to decimal
     hex_columns = ['CAN ID', 'Data1', 'Data2', 'Data3', 'Data4', 
                    'Data5', 'Data6', 'Data7', 'Data8', 'Source', 'Target']
-    df[hex_columns] = df[hex_columns].apply(hex_to_decimal_vectorized)
+    # Convert hex values to decimal
+    df[hex_columns] = df[hex_columns].apply(lambda x: int(x, 16) if pd.notnull(x) else None)
 
     # Drop the last row and reencode labels
     df = df.iloc[:-1]
-    df['label'] = df['label'].map({'R': 0, 'T': 1}).fillna(0).astype(int)
+    
+    # Map the attack column directly to the label column
+    df['label'] = df['attack'].astype(int)
 
     return df[['CAN ID', 'Data1', 'Data2', 'Data3', 'Data4', 
                'Data5', 'Data6', 'Data7', 'Data8', 'Source', 'Target', 'label']]
@@ -197,3 +199,14 @@ class GraphDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.data_list[idx]
+
+if __name__ == "__main__":
+    # Example test for dataset_creation_vectorized
+    test_path = r"datasets/can-train-and-test-v1.5/hcrl-ch/train_02_with_attacks/fuzzing-train.csv"
+    df = dataset_creation_vectorized(test_path)
+    print(df.head())  # Print the first few rows to verify the output
+
+    # Example test for graph_creation
+    root_folder = r"datasets/can-train-and-test-v1.5/hcrl-ch"
+    graph_dataset = graph_creation(root_folder, combined=False, dataset_path=None, dataset_type="type1")
+    print(f"Number of graphs: {len(graph_dataset)}")
