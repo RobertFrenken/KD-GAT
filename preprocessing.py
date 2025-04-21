@@ -209,13 +209,13 @@ class TestPreprocessing(unittest.TestCase):
     def test_dataset_creation_vectorized(self):
         test_path = r"datasets/can-train-and-test-v1.5/hcrl-ch/train_02_with_attacks/fuzzing-train.csv"
         df = dataset_creation_vectorized(test_path)
-        self.assertEqual(len(df.columns), 12)  # Check if the correct number of columns exists
-        self.assertTrue('label' in df.columns)  # Check if 'label' column exists
+        self.assertEqual(len(df.columns), 12)
+        self.assertTrue('label' in df.columns)
 
     def test_graph_creation(self):
         root_folder = r"datasets/can-train-and-test-v1.5/hcrl-ch"
         graph_dataset = graph_creation(root_folder)
-        self.assertGreater(len(graph_dataset), 0)  # Ensure graphs are created
+        self.assertGreater(len(graph_dataset), 0)
 
 
 if __name__ == "__main__":
