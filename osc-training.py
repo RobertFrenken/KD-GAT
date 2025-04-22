@@ -30,16 +30,19 @@ def main(config: DictConfig):
     print(f'Model is using device: {device}')
     if device.type == 'cuda':
         print(f"GPU: {torch.cuda.get_device_name(0)}")
+    
+    root_folders = {'hcrl_ch': r"datasets/can-train-and-test-v1.5/hcrl-ch",
+                    'hcrl_sa': r"datasets/can-train-and-test-v1.5/hcrl-sa",
+                    'set_01' : r"datasets/can-train-and-test-v1.5/set_01",
+                    'set_02' : r"datasets/can-train-and-test-v1.5/set_02",
+                    'set_03' : r"datasets/can-train-and-test-v1.5/set_03",
+                    'set_04' : r"datasets/can-train-and-test-v1.5/set_04",
+    }
 
-    root_folders = [r"datasets/can-train-and-test-v1.5/hcrl-ch",
-                    r"datasets/can-train-and-test-v1.5/hcrl-sa",
-                    r"datasets/can-train-and-test-v1.5/set_01",
-                    r"datasets/can-train-and-test-v1.5/set_02",
-                    r"datasets/can-train-and-test-v1.5/set_03",
-                    r"datasets/can-train-and-test-v1.5/set_04",
-                    ]
+    KEY = config_dict['root_folder']
+    root_folder = root_folders[KEY]
+    print(f"Root folder: {root_folder}")
 
-    root_folder = r"datasets/can-train-and-test-v1.5/hcrl-ch"
     dataset = graph_creation(root_folder)
     print(f"Number of graphs: {len(dataset)}")
     
@@ -53,8 +56,6 @@ def main(config: DictConfig):
     print("Size of the total dataset: ", len(dataset))
    
 
-    # Calculate the number of samples for training and testing
-    # Split the dataset into training and test sets
     train_size = int(TRAIN_RATIO * len(dataset))
     test_size = len(dataset) - train_size
     generator1 = torch.Generator().manual_seed(42)
@@ -80,7 +81,6 @@ def main(config: DictConfig):
     print('Size of Testing dataloader (samples): ', len(test_loader.dataset))
 
     # Knowledge Distillation Scenario
-    # Initialize models
     teacher_model = GATWithJK(in_channels=10, hidden_channels=32, out_channels=1, num_layers=5, heads=8).to(device)
     student_model = GATWithJK(in_channels=10, hidden_channels=32, out_channels=1, num_layers=2, heads=4).to(device)
 
@@ -101,12 +101,13 @@ def main(config: DictConfig):
     print("Starting sequential training...")
     trainer.train_sequential(train_loader, test_loader)
     # Save the best teacher model
-    torch.save(trainer.best_teacher_model, 'best_teacher_model.pth')
-    print("Best teacher model saved as 'best_teacher_model.pth'.")
-
+    teacher_model_filename = f'best_teacher_model_{KEY}.pth'
+    torch.save(trainer.best_teacher_model, teacher_model_filename)
+    print(f"Best teacher model saved as '{teacher_model_filename}'.")
     # Save the final student model
-    torch.save(student_model.state_dict(), 'final_student_model.pth')
-    print("Final student model saved as 'final_student_model.pth'.")
+    student_model_filename = f'final_student_model_{KEY}.pth'
+    torch.save(student_model.state_dict(), student_model_filename)
+    print(f"Final student model saved as '{student_model_filename}'.")
     
     # Save performance metrics
     metrics = {
