@@ -154,6 +154,9 @@ def dataset_creation_vectorized(path):
     df.columns = ['Timestamp', 'arbitration_id', 'data_field', 'attack']
     df.rename(columns={'arbitration_id': 'CAN ID'}, inplace=True)
 
+    # Ensure 'data_field' is a string and handle missing values
+    df['data_field'] = df['data_field'].astype(str).fillna('')
+
     # Add the DLC column based on the length of the data_field
     df['DLC'] = df['data_field'].apply(lambda x: len(x) // 2)
 
@@ -178,7 +181,7 @@ def dataset_creation_vectorized(path):
                    'Data5', 'Data6', 'Data7', 'Data8', 'Source', 'Target']
     # Convert hex values to decimal
     for col in hex_columns:
-        df[col] = df[col].apply(lambda x: int(x, 16) if pd.notnull(x) else None)
+        df[col] = df[col].apply(lambda x: int(x, 16) if pd.notnull(x) and isinstance(x, str) and all(c in '0123456789abcdefABCDEF' for c in x) else None)
 
     # Drop the last row and reencode labels
     df = df.iloc[:-1]
