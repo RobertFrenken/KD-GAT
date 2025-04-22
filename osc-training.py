@@ -100,12 +100,16 @@ def main(config: DictConfig):
     # Train teacher first, then student
     print("Starting sequential training...")
     trainer.train_sequential(train_loader, test_loader)
-    # Save the best teacher model
-    teacher_model_filename = f'best_teacher_model_{KEY}.pth'
+
+    # Define the folder to save the models
+    save_folder = "saved_models"
+    os.makedirs(save_folder, exist_ok=True)  # Create the folder if it doesn't exist
+
+    teacher_model_filename = os.path.join(save_folder, f'best_teacher_model_{KEY}.pth')
     torch.save(trainer.best_teacher_model, teacher_model_filename)
     print(f"Best teacher model saved as '{teacher_model_filename}'.")
-    # Save the final student model
-    student_model_filename = f'final_student_model_{KEY}.pth'
+
+    student_model_filename = os.path.join(save_folder, f'final_student_model_{KEY}.pth')
     torch.save(student_model.state_dict(), student_model_filename)
     print(f"Final student model saved as '{student_model_filename}'.")
     
