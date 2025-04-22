@@ -45,6 +45,10 @@ def main(config: DictConfig):
 
     dataset = graph_creation(root_folder)
     print(f"Number of graphs: {len(dataset)}")
+
+    for data in dataset:
+        assert not torch.isnan(data.x).any(), "Dataset contains NaN values!"
+        assert not torch.isinf(data.x).any(), "Dataset contains Inf values!"
     
     # hyperparameters from yaml file
     DATASIZE = config_dict['datasize']

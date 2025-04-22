@@ -33,6 +33,14 @@ def graph_creation(root_folder, window_size=50, stride=50):
     for csv_file in train_csv_files:
         print(f"Processing file: {csv_file}")
         df = dataset_creation_vectorized(csv_file)
+        # Check for NaN values in the DataFrame
+        # this is a stopgap. The issue is there are some rows where
+        # the data field is empty, and the column Data1 is left Nan
+        # in the future will need to handle this in the above function.
+        if df.isnull().values.any():
+            print(f"NaN values found in DataFrame from file: {csv_file}")
+            print(df[df.isnull().any(axis=1)])
+            df.fillna(0, inplace=True)  # Replace NaN values with 0
         graphs = create_graphs_numpy(df, window_size=window_size, stride=stride)
         combined_list.extend(graphs)
 
@@ -215,10 +223,18 @@ class TestPreprocessing(unittest.TestCase):
         self.assertEqual(len(df.columns), 12)
         self.assertTrue('label' in df.columns)
 
+        # Check for NaN values in the DataFrame
+        self.assertFalse(df.isnull().values.any(), "Dataset contains NaN values!")
+
     def test_graph_creation(self):
-        root_folder = r"datasets/can-train-and-test-v1.5/hcrl-ch"
+        root_folder = r"datasets/can-train-and-test-v1.5/set_02"
         graph_dataset = graph_creation(root_folder)
         self.assertGreater(len(graph_dataset), 0)
+
+         # Check for NaN values in the graph dataset
+        for data in graph_dataset:
+            self.assertFalse(torch.isnan(data.x).any(), "Graph dataset contains NaN values!")
+            self.assertFalse(torch.isinf(data.x).any(), "Graph dataset contains Inf values!")
 
 
 if __name__ == "__main__":
