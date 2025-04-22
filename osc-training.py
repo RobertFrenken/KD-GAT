@@ -34,6 +34,9 @@ def main(config: DictConfig):
     root_folders = [r"datasets/can-train-and-test-v1.5/hcrl-ch",
                     r"datasets/can-train-and-test-v1.5/hcrl-sa",
                     r"datasets/can-train-and-test-v1.5/set_01",
+                    r"datasets/can-train-and-test-v1.5/set_02",
+                    r"datasets/can-train-and-test-v1.5/set_03",
+                    r"datasets/can-train-and-test-v1.5/set_04",
                     ]
 
     root_folder = r"datasets/can-train-and-test-v1.5/hcrl-ch"
