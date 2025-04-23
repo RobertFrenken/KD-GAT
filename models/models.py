@@ -4,61 +4,7 @@ import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 from torch_geometric.nn import GATConv
 from torch_geometric.nn import global_mean_pool
-from torch_geometric.nn import GATConv, Linear, to_hetero, JumpingKnowledge
-class SimpleLSTM(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, output_size):
-        super(SimpleLSTM, self).__init__()
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        
-        # LSTM layer
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        
-        # Fully connected layer
-        self.fc = nn.Linear(hidden_size, output_size)
-        
-    def forward(self, x):
-        # Initialize hidden state with zeros
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-        
-        # Initialize cell state
-        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-        
-        # We need to detach as we are doing truncated backpropagation through time (BPTT)
-        # If we don't, we'll backprop all the way to the start even after going through another batch
-        out, (hn, cn) = self.lstm(x, (h0.detach(), c0.detach()))
-        
-        # Index hidden state of last time step
-        out = self.fc(out[:, -1, :])
-        return out
-
-class GNN(torch.nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels):
-        super(GNN, self).__init__()
-        self.conv1 = GCNConv(in_channels, hidden_channels)
-        self.conv2 = GCNConv(hidden_channels, hidden_channels)
-        self.fc = torch.nn.Linear(hidden_channels, out_channels)
-
-    def forward(self, data):
-        x, edge_index, batch = data.x, data.edge_index, data.batch
-        x = self.conv1(x, edge_index)
-        x = F.relu(x)
-        x = self.conv2(x, edge_index)
-        x = global_mean_pool(x, batch)  # Global mean pooling
-        x = self.fc(x)
-        return x
-
-class GATResBlock(nn.Module):
-    def __init__(self, in_feats, out_feats, num_heads):
-        super().__init__()
-        self.gat = GATConv(in_feats, out_feats, num_heads)
-        self.skip = nn.Linear(in_feats, out_feats * num_heads) if in_feats != out_feats else nn.Identity()
-    
-    def forward(self, x, edge_index):
-        x_gat = self.gat(x, edge_index)
-        x_skip = self.skip(x)
-        return F.elu(x_gat + x_skip)
-
+from torch_geometric.nn import GATConv, JumpingKnowledge
 class GATBinaryClassifier(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, num_heads, out_channels):
         super(GATBinaryClassifier, self).__init__()
