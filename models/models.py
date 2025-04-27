@@ -45,66 +45,21 @@ class GATWithJK(torch.nn.Module):
         # Final projection
         self.lin = torch.nn.Linear(hidden_channels * heads, out_channels)
 
-    def forward(self, data):
+    def forward(self, data, return_intermediate=False):
         x, edge_index, batch = data.x, data.edge_index, data.batch
         xs = []
         for conv in self.convs:
             x = conv(x, edge_index).relu()
             xs.append(x)
         
+        if return_intermediate:
+            return xs
+        
         # Aggregate layer outputs
         x = self.jk(xs)
         x = global_mean_pool(x, batch)  # Readout layer
         x = self.lin(x)
         return x
-
-class GATWithSkips(nn.Module):
-    def __init__(self, in_channels, hidden_channels, num_classes, num_heads=8):
-        super().__init__()
-        # Layer 1: Initial GAT layer
-        self.gat1 = GATConv(in_channels, 64, heads=num_heads)
-        self.skip_proj1 = nn.Linear(in_channels, 64 * num_heads)  # For dimension matching
-        
-        # Layer 2: Intermediate GAT layer
-        self.gat2 = GATConv(64 * num_heads, 128, heads=num_heads//2)
-        self.skip_proj2 = nn.Linear(64 * num_heads, 128 * (num_heads//2))
-        
-        # Layer 3: Final GAT layer with skip integration
-        self.gat3 = GATConv(128 * (num_heads//2) + 64 * num_heads, num_classes, heads=1)  # Concatenated input
-
-    def forward(self, x, edge_index):
-        # Layer 1
-        x1 = self.gat1(x, edge_index)
-        x_skip1 = self.skip_proj1(x)  # Project original features
-        
-        # Layer 2 with skip from Layer 1
-        x2 = self.gat2(x1, edge_index)
-        x_skip2 = self.skip_proj2(x1)  # Project Layer 1 output
-        
-        # Layer 3 with concatenated skips
-        x3 = torch.cat([x_skip1, x_skip2], dim=1)
-        return self.gat3(x3, edge_index)
-
-class EnhancedGAT(nn.Module):
-    def __init__(self, in_dim, out_dim):
-        super().__init__()
-        self.gat1 = GATConv(in_dim, 256, heads=4)
-        self.gat2 = GATConv(256*4, 256, heads=2)
-        self.gat3 = GATConv(256*2 + 256*4, out_dim, heads=1)
-        
-        self.skip_proj = nn.Sequential(
-            nn.Linear(in_dim, 256*4),
-            nn.ELU()
-        )
-
-    def forward(self, x, edge_index):
-        identity = self.skip_proj(x)
-        
-        x1 = F.elu(self.gat1(x, edge_index))
-        x2 = F.elu(self.gat2(x1, edge_index))
-        
-        combined = torch.cat([identity, x2], dim=1)
-        return self.gat3(combined, edge_index)
 
 
 if __name__ == '__main__':

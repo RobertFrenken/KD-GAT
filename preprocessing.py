@@ -25,7 +25,8 @@ def graph_creation(root_folder, folder_type='train_', window_size=50, stride=50)
     for dirpath, dirnames, filenames in os.walk(root_folder):
         if folder_type in dirpath.lower():  # Check if 'train_' is in the folder name
             for filename in filenames:
-                if filename.endswith('.csv'):  # Only include CSV files
+                if filename.endswith('.csv') and 'suppress' not in filename.lower() and 'masquerade' not in filename.lower():
+                    # Exclude files with 'suppress' or 'masquerade' in their names # Only include CSV files
                     train_csv_files.append(os.path.join(dirpath, filename))
     
     # Process each CSV file and create graphs
