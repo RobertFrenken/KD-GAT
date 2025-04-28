@@ -6,7 +6,7 @@ from torch_geometric.data import Data
 import os
 import unittest
 
-def graph_creation(root_folder, folder_type='train_', window_size=50, stride=50):
+def graph_creation(root_folder, folder_type='train_', window_size=50, stride=50, verbose=True):
     """
     Creates a dataset of graphs from a set of CSV files containing CAN data.
     
@@ -16,6 +16,7 @@ def graph_creation(root_folder, folder_type='train_', window_size=50, stride=50)
         datasize (float): The size of the dataset to be used. Default is 1.0 (100%).
         window_size (int): The size of the sliding window.
         stride (int): The stride for the sliding window.
+        verbose (bool): If True, prints additional information during processing.
     
     Returns:
         dataset: Class object GraphDataset pytorch geometric graph datasets.
@@ -32,15 +33,17 @@ def graph_creation(root_folder, folder_type='train_', window_size=50, stride=50)
     # Process each CSV file and create graphs
     combined_list = []
     for csv_file in train_csv_files:
-        print(f"Processing file: {csv_file}")
+        if verbose:
+            print(f"Processing file: {csv_file}")
         df = dataset_creation_vectorized(csv_file)
         # Check for NaN values in the DataFrame
         # this is a stopgap. The issue is there are some rows where
         # the data field is empty, and the column Data1 is left Nan
         # in the future will need to handle this in the above function.
         if df.isnull().values.any():
-            print(f"NaN values found in DataFrame from file: {csv_file}")
-            print(df[df.isnull().any(axis=1)])
+            if verbose:
+                print(f"NaN values found in DataFrame from file: {csv_file}")
+                print(df[df.isnull().any(axis=1)])
             df.fillna(0, inplace=True)  # Replace NaN values with 0
         graphs = create_graphs_numpy(df, window_size=window_size, stride=stride)
         combined_list.extend(graphs)

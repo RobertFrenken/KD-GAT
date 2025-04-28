@@ -47,7 +47,7 @@ def evaluate_model(model, data_loader, device):
 
 
 def main():
-    x =1 # Placeholder for the main function logic
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     teacher_model = GATWithJK(in_channels=10, hidden_channels=32, out_channels=1, num_layers=5, heads=8).to(device)
     student_model = GATWithJK(in_channels=10, hidden_channels=32, out_channels=1, num_layers=2, heads=4).to(device)
@@ -92,7 +92,7 @@ def main():
         print(f"Evaluating dataset in root folder: {root_folder}")
 
         # Load the test dataset using graph_creation
-        test_dataset = graph_creation(root_folder, folder_type="test_")
+        test_dataset = graph_creation(root_folder, folder_type="test_", verbose=False)
         test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
 
         # Load the teacher model
