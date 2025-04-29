@@ -23,10 +23,12 @@ class GATBinaryClassifier(torch.nn.Module):
         x = global_mean_pool(x, batch)  # Readout layer
         x = self.fc(x)
         return x  # Classification layer
+# Modify the GATWithJK model to include dropout
 class GATWithJK(torch.nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels, num_layers=3, heads=4):
+    def __init__(self, in_channels, hidden_channels, out_channels, num_layers=3, heads=4, dropout=0.5):
         super().__init__()
         self.convs = torch.nn.ModuleList()
+        self.dropout = dropout
         
         # GAT layers
         for i in range(num_layers):
@@ -50,6 +52,7 @@ class GATWithJK(torch.nn.Module):
         xs = []
         for conv in self.convs:
             x = conv(x, edge_index).relu()
+            x = F.dropout(x, p=self.dropout, training=self.training)  # Add dropout
             xs.append(x)
         
         if return_intermediate:
@@ -58,6 +61,7 @@ class GATWithJK(torch.nn.Module):
         # Aggregate layer outputs
         x = self.jk(xs)
         x = global_mean_pool(x, batch)  # Readout layer
+        x = F.dropout(x, p=self.dropout, training=self.training)  # Add dropout before final layer
         x = self.lin(x)
         return x
 

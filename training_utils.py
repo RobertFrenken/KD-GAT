@@ -27,6 +27,35 @@ def distillation_loss_fn(student_logits, teacher_logits, T=5.0):
     # KL divergence loss
     distill_loss = F.kl_div(student_log_prob, teacher_prob, reduction='batchmean') * (T * T)
     return distill_loss
+
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=1.0, gamma=2.0, reduction='mean'):
+        """
+        Focal Loss for addressing class imbalance.
+        Args:
+            alpha (float): Weighting factor for the minority class.
+            gamma (float): Focusing parameter to reduce the loss for well-classified examples.
+            reduction (str): Specifies the reduction to apply to the output ('mean', 'sum', or 'none').
+        """
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.reduction = reduction
+
+    def forward(self, inputs, targets):
+        # Compute binary cross-entropy loss
+        BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction='none')
+        # Compute the probability of the correct class
+        pt = torch.exp(-BCE_loss)
+        # Apply the focal loss formula
+        F_loss = self.alpha * (1 - pt) ** self.gamma * BCE_loss
+
+        if self.reduction == 'mean':
+            return F_loss.mean()
+        elif self.reduction == 'sum':
+            return F_loss.sum()
+        else:
+            return F_loss
 #########################################
 # 1) PyTorch Trainer Class              #
 #########################################
@@ -77,6 +106,9 @@ class PyTorchTrainer:
         self.model.eval()
         epoch_loss = 0
         all_preds, all_targets = [], []
+
+        # Use Focal Loss for validation
+        focal_loss_fn = FocalLoss(alpha=1.0, gamma=2.0)
         
         with torch.no_grad():
             for batch in val_loader:
@@ -84,7 +116,8 @@ class PyTorchTrainer:
                 targets = batch.y.float()
                 
                 outputs = self.model(batch).squeeze()
-                loss = self.loss_fn(outputs, targets)
+                # loss = self.loss_fn(outputs, targets)
+                loss = focal_loss_fn(outputs, targets)
                 
                 epoch_loss += loss.item() * batch.size(0)
                 preds = (outputs > 0).long()
@@ -145,6 +178,9 @@ class PyTorchDistillationTrainer(PyTorchTrainer):
         epoch_student_loss = 0
         epoch_distill_loss = 0
         all_preds, all_targets = [], []
+
+        # Use Focal Loss for the student model
+        focal_loss_fn = FocalLoss(alpha=1.0, gamma=2.0)
         if self.current_epoch == self.warmup_epochs:
                     print(f"Transitioning to knowledge distillation at epoch {self.current_epoch}...")
         
@@ -164,7 +200,8 @@ class PyTorchDistillationTrainer(PyTorchTrainer):
                 teacher_logits = teacher_outputs.view(-1)
                 student_logits = student_outputs.view(-1)
                 # Calculate combined loss
-                student_loss = self.loss_fn(student_outputs, targets)
+                # student_loss = self.loss_fn(student_outputs, targets)
+                student_loss = focal_loss_fn(student_outputs, targets)
                 # Distillation loss
                 distill_loss = distillation_loss_fn(student_logits, teacher_logits, T=5.0)
                 loss = (1 - self.alpha) * student_loss + self.alpha * distill_loss
@@ -174,7 +211,8 @@ class PyTorchDistillationTrainer(PyTorchTrainer):
                 epoch_distill_loss += distill_loss.item() * batch.size(0)
             else:
                 # Warmup phase or normal training
-                loss = self.loss_fn(student_outputs, targets)
+                loss = focal_loss_fn(student_outputs, targets)
+                # loss = self.loss_fn(student_outputs, targets)
                 epoch_student_loss += loss.item() * batch.size(0)
                 epoch_distill_loss = 0  # Not applicable
             
@@ -232,10 +270,13 @@ class DistillationTrainer:
         if not self.teacher:
             raise ValueError("Teacher model is not defined.")
         
+        # Use Focal Loss for the teacher model
+        focal_loss_fn = FocalLoss(alpha=1.0, gamma=2.0)
+        
         teacher_trainer = PyTorchTrainer(
             model=self.teacher,
             optimizer=torch.optim.Adam(self.teacher.parameters(), lr=self.lr),
-            loss_fn=torch.nn.BCEWithLogitsLoss(),
+            loss_fn=focal_loss_fn, # torch.nn.BCEWithLogitsLoss()
             device=self.device
         )
 
