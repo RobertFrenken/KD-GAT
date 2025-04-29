@@ -84,34 +84,86 @@ def main():
     "student_weight": "saved_models/final_student_model_ch.pth"},]
 
 
-    for dataset_info in sample_dataset:
+    vehicle_types = ["known_vehicle", "unknown_vehicle"]
+    attack_types = ["known_attack", "unknown_attack"]
+
+
+    # Iterate through each dataset and subfolder configuration
+    for dataset_info in test_datasets:
         root_folder = dataset_info["folder"]
         teacher_weight = dataset_info["teacher_weight"]
         student_weight = dataset_info["student_weight"]
 
         print(f"Evaluating dataset in root folder: {root_folder}")
 
-        # Load the test dataset using graph_creation
-        test_dataset = graph_creation(root_folder, folder_type="test_", verbose=False)
-        test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
+        subfolder_found = False  # Track if any matching subfolder is found
 
-        # Load the teacher model
-        teacher_model.load_state_dict(torch.load(teacher_weight))
-        teacher_model.eval()
+        # Special case for hcrl-ch folder
+        if "hcrl-ch" in root_folder:
+            for subfolder_name in os.listdir(root_folder):
+                subfolder_path = os.path.join(root_folder, subfolder_name)
 
-        # Load the student model
-        student_model.load_state_dict(torch.load(student_weight))
-        student_model.eval()
+                # Process subfolders like 'test_01_DoS' and 'test_02_fuzzing'
+                if os.path.isdir(subfolder_path) and subfolder_name.startswith("test_"):
+                    subfolder_found = True
+                    print(f"Evaluating subfolder: {subfolder_path}")
 
-        # Evaluate the teacher model
-        teacher_metrics = evaluate_model(teacher_model, test_loader, device)
-        print(f"Teacher Model - Accuracy: {teacher_metrics[0]:.4f}, Precision: {teacher_metrics[1]:.4f}, Recall: {teacher_metrics[2]:.4f}, F1 Score: {teacher_metrics[3]:.4f}")
+                    # Load the test dataset using graph_creation
+                    test_dataset = graph_creation(subfolder_path, folder_type="test_")
+                    test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
 
-        # Evaluate the student model
-        student_metrics = evaluate_model(student_model, test_loader, device)
-        print(f"Student Model - Accuracy: {student_metrics[0]:.4f}, Precision: {student_metrics[1]:.4f}, Recall: {student_metrics[2]:.4f}, F1 Score: {student_metrics[3]:.4f}")
+                    # Load the teacher model
+                    teacher_model.load_state_dict(torch.load(teacher_weight))
+                    teacher_model.eval()
 
-        print("-" * 50)
+                    # Load the student model
+                    student_model.load_state_dict(torch.load(student_weight))
+                    student_model.eval()
+
+                    # Evaluate the teacher model
+                    teacher_metrics = evaluate_model(teacher_model, test_loader, device)
+                    print(f"Teacher Model - Accuracy: {teacher_metrics[0]:.4f}, Precision: {teacher_metrics[1]:.4f}, Recall: {teacher_metrics[2]:.4f}, F1 Score: {teacher_metrics[3]:.4f}")
+
+                    # Evaluate the student model
+                    student_metrics = evaluate_model(student_model, test_loader, device)
+                    print(f"Student Model - Accuracy: {student_metrics[0]:.4f}, Precision: {student_metrics[1]:.4f}, Recall: {student_metrics[2]:.4f}, F1 Score: {student_metrics[3]:.4f}")
+
+                    print("-" * 50)
+
+        else:
+            # General case for other datasets
+            for subfolder_name in os.listdir(root_folder):
+                subfolder_path = os.path.join(root_folder, subfolder_name)
+
+                # Check if the subfolder name contains any of the keywords
+                if os.path.isdir(subfolder_path) and any(keyword in subfolder_name for keyword in vehicle_types + attack_types):
+                    subfolder_found = True
+                    print(f"Evaluating subfolder: {subfolder_path}")
+
+                    # Load the test dataset using graph_creation
+                    test_dataset = graph_creation(subfolder_path, folder_type="test_")
+                    test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
+
+                    # Load the teacher model
+                    teacher_model.load_state_dict(torch.load(teacher_weight))
+                    teacher_model.eval()
+
+                    # Load the student model
+                    student_model.load_state_dict(torch.load(student_weight))
+                    student_model.eval()
+
+                    # Evaluate the teacher model
+                    teacher_metrics = evaluate_model(teacher_model, test_loader, device)
+                    print(f"Teacher Model - Accuracy: {teacher_metrics[0]:.4f}, Precision: {teacher_metrics[1]:.4f}, Recall: {teacher_metrics[2]:.4f}, F1 Score: {teacher_metrics[3]:.4f}")
+
+                    # Evaluate the student model
+                    student_metrics = evaluate_model(student_model, test_loader, device)
+                    print(f"Student Model - Accuracy: {student_metrics[0]:.4f}, Precision: {student_metrics[1]:.4f}, Recall: {student_metrics[2]:.4f}, F1 Score: {student_metrics[3]:.4f}")
+
+                    print("-" * 50)
+
+        if not subfolder_found:
+            print(f"No matching subfolders found in root folder: {root_folder}.")
 
         
        
