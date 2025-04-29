@@ -27,7 +27,9 @@ def distillation_loss_fn(student_logits, teacher_logits, T=5.0):
     # KL divergence loss
     distill_loss = F.kl_div(student_log_prob, teacher_prob, reduction='batchmean') * (T * T)
     return distill_loss
-
+#########################################
+# 0) Focal Loss Function         #
+#########################################
 class FocalLoss(nn.Module):
     def __init__(self, alpha=1.0, gamma=2.0, reduction='mean'):
         """

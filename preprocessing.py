@@ -6,7 +6,7 @@ from torch_geometric.data import Data
 import os
 import unittest
 
-def graph_creation(root_folder, folder_type='train_', window_size=50, stride=50, verbose=True):
+def graph_creation(root_folder, folder_type='train_', window_size=50, stride=50, verbose=False):
     """
     Creates a dataset of graphs from a set of CSV files containing CAN data.
     
