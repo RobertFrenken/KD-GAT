@@ -16,9 +16,8 @@ import json
 from models.models import GATWithJK
 from preprocessing import graph_creation
 from training_utils import PyTorchTrainer, PyTorchDistillationTrainer, DistillationTrainer
-WANDB_API_KEY = "02399594f766bc76e4af844217bf8188630cae40"
-@hydra.main(config_path="conf", config_name="base", version_base=None)
 
+@hydra.main(config_path="conf", config_name="base", version_base=None)
 def main(config: DictConfig):
 
     # add hydra instantiation to the script
@@ -56,6 +55,7 @@ def main(config: DictConfig):
     LR = config_dict['lr']
     BATCH_SIZE = config_dict['batch_size']
     TRAIN_RATIO = config_dict['train_ratio']
+    USE_FOCAL_LOSS = config_dict['use_focal_loss']  # Read from the YAML config
 
     print("Size of the total dataset: ", len(dataset))
    
@@ -97,7 +97,8 @@ def main(config: DictConfig):
         student_epochs=EPOCHS,  # Train student for 50 epochs
         distill_alpha=0.5,      # Weight for distillation loss
         warmup_epochs=5,        # Warmup epochs for student training
-        lr=LR   # Learning rate
+        lr=LR ,
+        use_focal_loss=USE_FOCAL_LOSS,  # Use Focal Loss for student training
     )
 
     

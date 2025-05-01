@@ -105,35 +105,77 @@ def main(evaluate_known_only=True):
 
         # Special case for hcrl-ch folder
         if "hcrl-ch" in root_folder:
+
+            combined_dataset = []  # List to store data from all CSV files
+
             for subfolder_name in os.listdir(root_folder):
                 subfolder_path = os.path.join(root_folder, subfolder_name)
 
                 # Process subfolders like 'test_01_DoS' and 'test_02_fuzzing'
                 if os.path.isdir(subfolder_path) and subfolder_name.startswith("test_"):
-                    subfolder_found = True
-                    print(f"Evaluating subfolder: {subfolder_path}")
+                    print(f"Loading data from subfolder: {subfolder_path}")
 
-                    # Load the test dataset using graph_creation
+                    # Load the dataset from the subfolder
                     test_dataset = graph_creation(subfolder_path, folder_type="test_")
-                    test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
+                    combined_dataset.extend(test_dataset)  # Combine datasets
 
-                    # Load the teacher model
-                    teacher_model.load_state_dict(torch.load(teacher_weight))
-                    teacher_model.eval()
+            if combined_dataset:
+                print(f"Evaluating combined dataset for hcrl-ch...")
 
-                    # Load the student model
-                    student_model.load_state_dict(torch.load(student_weight))
-                    student_model.eval()
+                # Create a DataLoader for the combined dataset
+                combined_loader = DataLoader(combined_dataset, batch_size=128, shuffle=False)
 
-                    # Evaluate the teacher model
-                    teacher_metrics = evaluate_model(teacher_model, test_loader, device)
-                    print(f"Teacher Model - Accuracy: {teacher_metrics[0]:.4f}, Precision: {teacher_metrics[1]:.4f}, Recall: {teacher_metrics[2]:.4f}, F1 Score: {teacher_metrics[3]:.4f}")
+                # Load the teacher model
+                teacher_model.load_state_dict(torch.load(teacher_weight))
+                teacher_model.eval()
 
-                    # Evaluate the student model
-                    student_metrics = evaluate_model(student_model, test_loader, device)
-                    print(f"Student Model - Accuracy: {student_metrics[0]:.4f}, Precision: {student_metrics[1]:.4f}, Recall: {student_metrics[2]:.4f}, F1 Score: {student_metrics[3]:.4f}")
+                # Load the student model
+                student_model.load_state_dict(torch.load(student_weight))
+                student_model.eval()
 
-                    print("-" * 50)
+                # Evaluate the teacher model
+                teacher_metrics = evaluate_model(teacher_model, combined_loader, device)
+                print(f"Teacher Model - Accuracy: {teacher_metrics[0]:.4f}, Precision: {teacher_metrics[1]:.4f}, Recall: {teacher_metrics[2]:.4f}, F1 Score: {teacher_metrics[3]:.4f}")
+
+                # Evaluate the student model
+                student_metrics = evaluate_model(student_model, combined_loader, device)
+                print(f"Student Model - Accuracy: {student_metrics[0]:.4f}, Precision: {student_metrics[1]:.4f}, Recall: {student_metrics[2]:.4f}, F1 Score: {student_metrics[3]:.4f}")
+
+                print("-" * 50)
+            else:
+                print(f"No valid data found in hcrl-ch folder.")
+
+
+            # THIS ONE DOES INDIVIDUAL SUBFOLDER EVALUATION
+            # for subfolder_name in os.listdir(root_folder):
+            #     subfolder_path = os.path.join(root_folder, subfolder_name)
+
+            #     # Process subfolders like 'test_01_DoS' and 'test_02_fuzzing'
+            #     if os.path.isdir(subfolder_path) and subfolder_name.startswith("test_"):
+            #         subfolder_found = True
+            #         print(f"Evaluating subfolder: {subfolder_path}")
+
+            #         # Load the test dataset using graph_creation
+            #         test_dataset = graph_creation(subfolder_path, folder_type="test_")
+            #         test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
+
+            #         # Load the teacher model
+            #         teacher_model.load_state_dict(torch.load(teacher_weight))
+            #         teacher_model.eval()
+
+            #         # Load the student model
+            #         student_model.load_state_dict(torch.load(student_weight))
+            #         student_model.eval()
+
+            #         # Evaluate the teacher model
+            #         teacher_metrics = evaluate_model(teacher_model, test_loader, device)
+            #         print(f"Teacher Model - Accuracy: {teacher_metrics[0]:.4f}, Precision: {teacher_metrics[1]:.4f}, Recall: {teacher_metrics[2]:.4f}, F1 Score: {teacher_metrics[3]:.4f}")
+
+            #         # Evaluate the student model
+            #         student_metrics = evaluate_model(student_model, test_loader, device)
+            #         print(f"Student Model - Accuracy: {student_metrics[0]:.4f}, Precision: {student_metrics[1]:.4f}, Recall: {student_metrics[2]:.4f}, F1 Score: {student_metrics[3]:.4f}")
+
+            #         print("-" * 50)
 
         else:
             # General case for other datasets
