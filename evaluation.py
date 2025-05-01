@@ -20,7 +20,7 @@ from models.models import GATWithJK
 from preprocessing import graph_creation
 from training_utils import PyTorchTrainer, PyTorchDistillationTrainer, DistillationTrainer
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-
+from sklearn.metrics import classification_report, roc_auc_score
 def evaluate_model(model, data_loader, device):
     all_preds = []
     all_labels = []
@@ -42,11 +42,13 @@ def evaluate_model(model, data_loader, device):
     precision = precision_score(all_labels, all_preds, zero_division=0)
     recall = recall_score(all_labels, all_preds, zero_division=0)
     f1 = f1_score(all_labels, all_preds, zero_division=0)
+    # print(classification_report(all_labels, all_preds))
+    # print(f"AUC-ROC: {roc_auc_score(all_labels, all_preds):.4f}")
 
     return accuracy, precision, recall, f1
 
 
-def main():
+def main(evaluate_known_only=True):
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     teacher_model = GATWithJK(in_channels=10, hidden_channels=32, out_channels=1, num_layers=5, heads=8).to(device)
@@ -83,9 +85,12 @@ def main():
     "teacher_weight": "saved_models/best_teacher_model_ch.pth", 
     "student_weight": "saved_models/final_student_model_ch.pth"},]
 
-
-    vehicle_types = ["known_vehicle", "unknown_vehicle"]
-    attack_types = ["known_attack", "unknown_attack"]
+    if evaluate_known_only:
+        vehicle_types = ["known_vehicle"]
+        attack_types = ["known_attack"]
+    else:
+        vehicle_types = ["known_vehicle", "unknown_vehicle"]
+        attack_types = ["known_attack", "unknown_attack"]
 
 
     # Iterate through each dataset and subfolder configuration
@@ -135,8 +140,8 @@ def main():
             for subfolder_name in os.listdir(root_folder):
                 subfolder_path = os.path.join(root_folder, subfolder_name)
 
-                # Check if the subfolder name contains any of the keywords
-                if os.path.isdir(subfolder_path) and any(keyword in subfolder_name for keyword in vehicle_types + attack_types):
+                # Only process the specific subfolder 'test_01_known_vehicle_known_attack'
+                if subfolder_name == "test_01_known_vehicle_known_attack":
                     subfolder_found = True
                     print(f"Evaluating subfolder: {subfolder_path}")
 

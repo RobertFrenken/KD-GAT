@@ -25,7 +25,8 @@ class GATBinaryClassifier(torch.nn.Module):
         return x  # Classification layer
 # Modify the GATWithJK model to include dropout
 class GATWithJK(torch.nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels, num_layers=3, heads=4, dropout=0.5):
+    def __init__(self, in_channels, hidden_channels, out_channels, 
+                 num_layers=3, heads=4, dropout=0.2, num_fc_layers=3):
         super().__init__()
         self.convs = torch.nn.ModuleList()
         self.dropout = dropout
@@ -43,9 +44,19 @@ class GATWithJK(torch.nn.Module):
             channels=hidden_channels * heads,
             num_layers=num_layers
         )
+
+        # Fully connected layers after pooling
+        self.fc_layers = torch.nn.ModuleList()
+        fc_input_dim = hidden_channels * heads
+        for _ in range(num_fc_layers - 1):
+            self.fc_layers.append(torch.nn.Linear(fc_input_dim, fc_input_dim))
+            self.fc_layers.append(torch.nn.ReLU())
+            self.fc_layers.append(torch.nn.Dropout(p=dropout))
+        self.fc_layers.append(torch.nn.Linear(fc_input_dim, out_channels))  # Final output layer
         
         # Final projection
-        self.lin = torch.nn.Linear(hidden_channels * heads, out_channels)
+        # self.lin = torch.nn.Linear(hidden_channels * heads, out_channels)
+        
 
     def forward(self, data, return_intermediate=False):
         x, edge_index, batch = data.x, data.edge_index, data.batch
@@ -61,12 +72,18 @@ class GATWithJK(torch.nn.Module):
         # Aggregate layer outputs
         x = self.jk(xs)
         x = global_mean_pool(x, batch)  # Readout layer
-        x = F.dropout(x, p=self.dropout, training=self.training)  # Add dropout before final layer
-        x = self.lin(x)
+        # Pass through fully connected layers + final output layer
+        for layer in self.fc_layers:
+            x = layer(x)
+        # x = F.dropout(x, p=self.dropout, training=self.training)  # Add dropout before final layer
+        # x = self.lin(x)
         return x
 
 
 if __name__ == '__main__':
+    # Knowledge Distillation Scenario
+    teacher_model = GATWithJK(in_channels=10, hidden_channels=32, out_channels=1, num_layers=5, heads=8)
+    student_model = GATWithJK(in_channels=10, hidden_channels=32, out_channels=1, num_layers=2, heads=4)
     net = GATWithJK(10, 8, 1)
 
     def model_characteristics(model):
@@ -81,5 +98,7 @@ if __name__ == '__main__':
         print(f'Number of Parameters: {num_params:.3f}')
         print(f'Model size: {size_all_mb:.3f} MB')
 
-    model_characteristics(net)
-    print(net)
+    model_characteristics(teacher_model)
+    print(teacher_model)
+    # model_characteristics(student_model)
+    # print(student_model)
