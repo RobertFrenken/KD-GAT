@@ -1,5 +1,25 @@
 # KD-GAT: Combining Knowledge Distillation and Graph Attention Transformer for a Controller Area Network Intrusion Detection System
 
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)
+---
+
+## Table of Contents
+
+- [Description](#description)
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Screenshots](#screenshots)
+- [Configuration](#configuration)
+- [Datasets](#datasets)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+- [Contact](#contact)
+
+---
 
 This repository provides several datasets for training, testing, and analysis. See the table below for details and download links.
 
