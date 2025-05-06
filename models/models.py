@@ -100,5 +100,5 @@ if __name__ == '__main__':
 
     model_characteristics(teacher_model)
     print(teacher_model)
-    # model_characteristics(student_model)
-    # print(student_model)
+    model_characteristics(student_model)
+    print(student_model)
