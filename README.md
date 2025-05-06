@@ -20,6 +20,39 @@
 - [Contact](#contact)
 
 ---
+## Description
+
+KD-GAT is a machine learning framework that combines **Knowledge Distillation (KD)** and **Graph Attention Networks (GAT)** to create a robust intrusion detection system for Controller Area Networks (CAN). This project aims to improve cybersecurity in automotive systems by detecting malicious activities on the CAN bus.
+
+The framework leverages:
+- **Knowledge Distillation**: To train lightweight student models for deployment on edge devices.
+- **Graph Attention Networks**: To model relationships between CAN messages effectively.
+
+---
+
+## Features
+
+- **Knowledge Distillation**: Train teacher-student models for efficient inference.
+- **Graph-Based Learning**: Use GATs to process CAN data as graph representations.
+- **Support for Multiple Datasets**: Preprocessing pipelines for various CAN datasets.
+- **Custom Loss Functions**: Includes Focal Loss to address class imbalance.
+- **Reproducibility**: Configurable training and evaluation pipelines with YAML files.
+
+---
+
+## Installation
+
+### Prerequisites
+- Python 3.8+
+- PyTorch 1.12+
+- PyTorch Geometric
+- Other dependencies listed in `requirements.txt`
+
+### Steps
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-username/CAN-Graph.git
+   cd CAN-Graph
 
 This repository provides several datasets for training, testing, and analysis. See the table below for details and download links.
 
@@ -28,11 +61,3 @@ This repository provides several datasets for training, testing, and analysis. S
 | Car Survival | Sample training data        | [Link](https://ocslab.hksecurity.net/Datasets/survival-ids)      |
 | CAR-Hacking Dataset| Test data for evaluation    | [Link](https://ocslab.hksecurity.net/Datasets/car-hacking-dataset)     |
 | can-train-and-test | Additional unlabeled data   | [Link](https://bitbucket.org/brooke-lampe/can-train-and-test-v1.5/src/master/)  |
-
-
-Other Datasets
-| Name      | Description                 |Link                                      |
-|-----------|-----------------------------|----------------------------------------------------|
-| Ventus Dataset | Sample training data        | [Link]()      |
-| Heavy Truck Dataset| Test data for evaluation    |[Link](https://www.engr.colostate.edu/~jdaily/J1939/candata.html)     |
-| OTIDS | Additional unlabeled data   |[Link](https://ocslab.hksecurity.net/Datasets/survival-ids)  |
