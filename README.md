@@ -13,8 +13,6 @@
 - [Screenshots](#screenshots)
 - [Configuration](#configuration)
 - [Datasets](#datasets)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 - [Contact](#contact)
