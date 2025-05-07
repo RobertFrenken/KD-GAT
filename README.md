@@ -1,7 +1,7 @@
 # KD-GAT: Combining Knowledge Distillation and Graph Attention Transformer for a Controller Area Network Intrusion Detection System
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)
+<!-- ![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg) -->
 ---
 
 ## Table of Contents
@@ -10,13 +10,9 @@
 - [Features](#features)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Screenshots](#screenshots)
-- [Configuration](#configuration)
 - [Datasets](#datasets)
-- [Troubleshooting](#troubleshooting)
 - [License](#license)
-- [Contact](#contact)
-
+- [TODO](#TODO)
 ---
 ## Description
 
@@ -37,27 +33,45 @@ The framework leverages:
 - **Reproducibility**: Configurable training and evaluation pipelines with YAML files.
 
 ---
-
-## Installation
-
 ### Prerequisites
 - Python 3.8+
 - PyTorch 1.12+
 - PyTorch Geometric
 - Other dependencies listed in `requirements.txt`
 
-### Steps
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/your-username/CAN-Graph.git
-   cd CAN-Graph
-
-
+## Installation
+```bash
+    git clone https://github.com/robertfrenken/CAN-Graph.git
+    cd CAN-Graph
+    python -m venv venv
+    venv\Scripts\activate
+    pip install -r requirements.txt
+```
+## Usage
+To train the teacher and student models:
+```bash
+python osc-training.py
+```
+To evaluate the models:
+```bash
+python evaluation.py
+```
 ## Datasets
-This repository provides several datasets for training, testing, and analysis. See the table below for details and download links.
+Datasets should be in a folder called datasets. This pro
 
 | Name      | Description                  | Link                                      |
 |-----------|-----------------------------|----------------------------------------------------|
-| Car Survival | Sample training data        | [Link](https://ocslab.hksecurity.net/Datasets/survival-ids)      |
-| CAR-Hacking Dataset| Test data for evaluation    | [Link](https://ocslab.hksecurity.net/Datasets/car-hacking-dataset)     |
-| can-train-and-test | Additional unlabeled data   | [Link](https://bitbucket.org/brooke-lampe/can-train-and-test-v1.5/src/master/)  |
+| can-train-and-test | Primary dataset. Contains all 3 datasets.   | [Link](https://bitbucket.org/brooke-lampe/can-train-and-test-v1.5/src/master/)  |
+| Car Survival | For reference. Use format from above.     | [Link](https://ocslab.hksecurity.net/Datasets/survival-ids)      |
+| CAR-Hacking Dataset| For reference. Use format from above.   | [Link](https://ocslab.hksecurity.net/Datasets/car-hacking-dataset)     |
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## TODO
+
+- [ ] Add details about base.yaml file
+- [ ] Improve preprocessing pipelines for additional datasets.
+- [ ] Add support for real-time CAN data processing.
+- [ ] Publish pre-trained models for public use.
