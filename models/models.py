@@ -1,29 +1,7 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GCNConv
-from torch_geometric.nn import GATConv
 from torch_geometric.nn import global_mean_pool
 from torch_geometric.nn import GATConv, JumpingKnowledge
-class GATBinaryClassifier(torch.nn.Module):
-    def __init__(self, in_channels, hidden_channels, num_heads, out_channels):
-        super(GATBinaryClassifier, self).__init__()
-        self.conv1 = GATConv(in_channels, hidden_channels, heads=num_heads)
-        self.conv2 = GATConv(hidden_channels * num_heads, hidden_channels, heads=1)
-        self.conv3 = GATConv(hidden_channels * num_heads, hidden_channels, heads=1)
-        self.fc = torch.nn.Linear(hidden_channels, out_channels)
-
-    def forward(self, data):
-        x, edge_index, batch = data.x, data.edge_index, data.batch
-        x = self.conv1(x, edge_index)
-        x = F.elu(x)
-        # x = F.dropout(x, training=self.training)
-        x = self.conv2(x, edge_index) # + x  # Skip connection
-        x = F.dropout(x, training=self.training)
-        x = global_mean_pool(x, batch)  # Readout layer
-        x = self.fc(x)
-        return x  # Classification layer
-# Modify the GATWithJK model to include dropout
 class GATWithJK(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, 
                  num_layers=3, heads=4, dropout=0.2, num_fc_layers=3):
@@ -44,18 +22,16 @@ class GATWithJK(torch.nn.Module):
             channels=hidden_channels * heads,
             num_layers=num_layers
         )
-
-        # Fully connected layers after pooling
+        
+        # Fully connected layers
         self.fc_layers = torch.nn.ModuleList()
         fc_input_dim = hidden_channels * heads
         for _ in range(num_fc_layers - 1):
             self.fc_layers.append(torch.nn.Linear(fc_input_dim, fc_input_dim))
             self.fc_layers.append(torch.nn.ReLU())
             self.fc_layers.append(torch.nn.Dropout(p=dropout))
-        self.fc_layers.append(torch.nn.Linear(fc_input_dim, out_channels))  # Final output layer
+        self.fc_layers.append(torch.nn.Linear(fc_input_dim, out_channels))
         
-        # Final projection
-        # self.lin = torch.nn.Linear(hidden_channels * heads, out_channels)
         
 
     def forward(self, data, return_intermediate=False):
@@ -75,8 +51,7 @@ class GATWithJK(torch.nn.Module):
         # Pass through fully connected layers + final output layer
         for layer in self.fc_layers:
             x = layer(x)
-        # x = F.dropout(x, p=self.dropout, training=self.training)  # Add dropout before final layer
-        # x = self.lin(x)
+        
         return x
 
 
